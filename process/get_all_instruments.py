@@ -33,18 +33,11 @@ async def write_all_instruments(key,secret,instrument_id = "BTCUSDT.BINANCE"):
     )
     await client.connect()
 
-    provider = BinanceFuturesInstrumentProvider(
-        client=client,
-        logger=Logger(clock=clock),
-        account_type=BinanceAccountType.FUTURES_USDT,
-    )
-
     await provider.load_all_async()
 
     instruments = provider.list_all()
-    catalog = ParquetDataCatalog("catalog")
-    #for instrument in instruments:
-        #write_objects(catalog=catalog, chunk=[instrument])
+    catalog = ParquetDataCatalog("../catalog/.")
+    #write_objects(catalog,instruments)
     await client.disconnect()
     return provider.find(instrument_id)
 
