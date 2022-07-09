@@ -43,7 +43,8 @@ async def write_all_instruments(key,secret,instrument_id = "BTCUSDT.BINANCE"):
 
     instruments = provider.list_all()
     catalog = ParquetDataCatalog("catalog")
-    #write_objects(catalog,instruments)
+    #for instrument in instruments:
+        #write_objects(catalog=catalog, chunk=[instrument])
     await client.disconnect()
     return provider.find(instrument_id)
 
