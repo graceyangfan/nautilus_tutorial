@@ -1,16 +1,10 @@
+#!/usr/bin/env python
+import sys
+
 from setuptools import setup
 
-from setuptools_rust import RustBin
+from setuptools_rust import RustExtension
 
 setup(
-    name="avellaneda_stoikov",
-    version="1.0",
-    rust_extensions=[
-        RustBin(
-            "avellaneda_stoikov",
-            args=["--profile", "release-lto"],
-        )
-    ],
-    # rust extensions are not zip safe, just like C-extensions.
-    zip_safe=False,
+    rust_extensions=[RustExtension("avellaneda_stoikov.avellaneda_stoikov")],
 )

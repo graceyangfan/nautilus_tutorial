@@ -1,7 +1,3 @@
-use super::multicurve_aksolver::MultiCurveAkSolver;
-use super::regression_aksolver::RegressionAkSolver;
-use super::traits::AbstractAkSolver;
-
 #[derive(Debug, Copy, Clone)]
 pub enum SolverType {
     MultiCurve,
@@ -21,11 +17,7 @@ impl AkSolverFactory {
     pub fn new(t: &SolverType) -> Self {
         AkSolverFactory { solver_type: *t }
     }
-
-    pub fn get_solver(&self, spread_specification: &[f64]) -> Box<dyn AbstractAkSolver> {
-        match self.solver_type {
-            SolverType::MultiCurve => MultiCurveAkSolver::new(&spread_specification),
-            SolverType::LogRegression => RegressionAkSolver::new(&spread_specification),
-        }
+    pub fn get_solver_type(&self) -> SolverType {
+        self.solver_type
     }
 }

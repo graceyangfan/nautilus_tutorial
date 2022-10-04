@@ -5,8 +5,10 @@ use crate::{
         //intensity_info::IntensityInfo,
     },
 };
+extern crate pyo3;
+use pyo3::prelude::*;
 
-
+#[pyclass]
 pub struct AvellanedaStoikov {
     pub tick_size: f64,
     pub n_spreads: usize,
@@ -16,7 +18,9 @@ pub struct AvellanedaStoikov {
     pub ie: IntensityEstimator,
 }
 
+#[pymethods]
 impl AvellanedaStoikov {
+    #[new] 
     pub fn new(
         tick_size: f64,
         n_spreads: usize,
@@ -61,6 +65,13 @@ impl AvellanedaStoikov {
     }
 
 }
+
+#[pymodule]
+fn avellaneda_stoikov(_: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<AvellanedaStoikov>()?;
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {

@@ -1,11 +1,26 @@
-use super::aksolver_factory::AkSolverFactory;
+use super::aksolver_factory::{AkSolverFactory,SolverType};
 use super::empirical_intensity_estimator::EmpiricalIntensityEstimator;
-use super::traits::AbstractAkSolver;
+use super::multicurve_aksolver::MultiCurveAkSolver;
+use super::regression_aksolver::RegressionAkSolver;
+
+pub enum AbstractAkSolver {
+    MultiCurve(MultiCurveAkSolver),
+    LogRegression(RegressionAkSolver),
+}
+
+impl AbstractAkSolver{
+    pub fn solve_ak(&mut self, intensities: &[f64]) -> (f64, f64){
+        match self {
+            AbstractAkSolver::MultiCurve(item) => item.solve_ak(intensities),
+            AbstractAkSolver::LogRegression(item) => item.solve_ak(intensities),
+        }
+    }
+}
 
 pub struct SpreadIntensityCurve {
     pub intensity_estimators: Vec<EmpiricalIntensityEstimator>,
     pub intensity_estimates: Vec<f64>,
-    pub aksolver: Box<dyn AbstractAkSolver>,
+    pub aksolver: AbstractAkSolver,
 }
 
 impl SpreadIntensityCurve {
@@ -28,7 +43,12 @@ impl SpreadIntensityCurve {
             ))
         }
 
-        let aksolver = solver_factory.get_solver(&spread_specification);
+        let solver_type = solver_factory.get_solver_type();
+        let aksolver = match solver_type {
+            SolverType::MultiCurve => AbstractAkSolver::MultiCurve(MultiCurveAkSolver::new(&spread_specification)),
+            SolverType::LogRegression => AbstractAkSolver::LogRegression(RegressionAkSolver::new(&spread_specification)),
+        };
+    
 
         SpreadIntensityCurve {
             intensity_estimators: intensity_estimators,

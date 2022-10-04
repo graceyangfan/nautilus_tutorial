@@ -1,6 +1,4 @@
 use log::debug;
-
-use super::traits::AbstractAkSolver;
 use std::time::Instant;
 
 pub struct MultiCurveAkSolver {
@@ -9,19 +7,17 @@ pub struct MultiCurveAkSolver {
     pub k_estimates: Vec<f64>,
 }
 
-impl AbstractAkSolver for MultiCurveAkSolver {
-    fn new(spread_specification: &[f64]) -> Box<dyn AbstractAkSolver> {
+impl MultiCurveAkSolver{
+    pub fn new(spread_specification:&[f64]) -> Self {
         let n_estimates = spread_specification.len() * (spread_specification.len() - 1) / 2;
-        let mut solver = MultiCurveAkSolver {
-            spread_specification: spread_specification.to_vec(),
+        let spread_specification = spread_specification.iter().map(|&val| val.abs()).collect();
+        MultiCurveAkSolver {
+            spread_specification: spread_specification,
             a_estimates: vec![0.0; n_estimates],
             k_estimates: vec![0.0; n_estimates],
-        };
-        solver.spread_specification = solver.abs_spread(spread_specification);
-        Box::new(solver)
+        }
     }
-
-    fn solve_ak(&mut self, intensities: &[f64]) -> (f64, f64) {
+    pub fn solve_ak(&mut self, intensities: &[f64]) -> (f64, f64) {
         let ins = Instant::now();
 
         let mut est_idx = 0;
@@ -39,5 +35,14 @@ impl AbstractAkSolver for MultiCurveAkSolver {
         let k_mean = self.mean(&self.k_estimates).unwrap();
         debug!("MultiCurveAkSolver time: {:?}", ins.elapsed());
         return (a_mean, k_mean);
+    }
+    pub fn mean(&self, data: &[f64]) -> Option<f64> {
+        let sum = data.iter().sum::<f64>();
+        let count = data.len();
+
+        match count {
+            positive if positive > 0 => Some(sum / count as f64),
+            _ => None,
+        }
     }
 }

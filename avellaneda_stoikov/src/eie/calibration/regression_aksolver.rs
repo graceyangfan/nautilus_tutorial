@@ -1,4 +1,3 @@
-use super::traits::AbstractAkSolver;
 use linreg::linear_regression_of;
 use log::debug;
 use std::time::Instant;
@@ -8,17 +7,16 @@ pub struct RegressionAkSolver {
     pub spread_specification: Vec<f64>,
 }
 
-impl AbstractAkSolver for RegressionAkSolver {
-    fn new(spread_specification: &[f64]) -> Box<dyn AbstractAkSolver> {
-        let mut solver = RegressionAkSolver {
-            last_valid_value: (0f64, 0f64),
-            spread_specification: spread_specification.to_vec(),
-        };
-        solver.spread_specification = solver.abs_spread(spread_specification);
-        Box::new(solver)
-    }
 
-    fn solve_ak(&mut self, intensities: &[f64]) -> (f64, f64) {
+impl RegressionAkSolver {
+    pub fn new(spread_specification: &[f64]) -> Self {
+        let spread_specification = spread_specification.iter().map(|&val| val.abs()).collect();
+        RegressionAkSolver {
+            last_valid_value: (0f64, 0f64),
+            spread_specification: spread_specification,
+        }
+    }
+    pub fn solve_ak(&mut self, intensities: &[f64]) -> (f64, f64) {
         let ins = Instant::now();
 
         let mut tuples: Vec<(f64, f64)> = Vec::new();
@@ -33,4 +31,14 @@ impl AbstractAkSolver for RegressionAkSolver {
         debug!("RegressionAkSolver time: {:?}", ins.elapsed());
         return (intercept.exp(), -slope);
     }
+    pub fn mean(&self, data: &[f64]) -> Option<f64> {
+        let sum = data.iter().sum::<f64>();
+        let count = data.len();
+
+        match count {
+            positive if positive > 0 => Some(sum / count as f64),
+            _ => None,
+        }
+    }
 }
+
