@@ -15,6 +15,7 @@ pub struct AvellanedaStoikov {
     pub estimate_window: u64,
     pub period: u64,
     pub start_time: u64,  //time in milliseconds (ms)
+    pub initlized: bool,
     pub ie: IntensityEstimator,
 }
 
@@ -43,6 +44,7 @@ impl AvellanedaStoikov {
             estimate_window: estimate_window,
             period: period, 
             start_time: start_time,
+            initlized: false,
             ie:ie,
         }
     }
@@ -56,10 +58,13 @@ impl AvellanedaStoikov {
     {
         let can_get = self.ie.on_tick(bid, ask, ts);
         // wait to get more data
-        if can_get && ts > self.start_time + self.estimate_window + 1 {
+        if can_get && ts > self.start_time + self.estimate_window + 1{
+            self.initlized = True;
             let ii = self.ie.estimate(ts);
             return ii.get_ak();
-        } else {
+        }
+        else{
+            self.initlized = False;
             (0.0,0.0,0.0,0.0)
         }
     }
@@ -91,6 +96,8 @@ mod tests {
             period,
             start_time,
         );
+        let x = 10_f64.ln();
+        println!("{}",x);
         //println!("{}",&as_ex.estimate_window);
         let info = as_ex.calculate_intensity_info(
             0.900,
