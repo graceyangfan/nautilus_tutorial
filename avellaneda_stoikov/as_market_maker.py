@@ -78,7 +78,7 @@ class ASMarketMakerConfig(StrategyConfig):
     
     order_qty: float = 1 
     n_spreads: int = 10 
-    estimate_window: int = 6000000
+    estimate_window: int = 600000
     period: int = 2000 
     sigma_tick_period: int = 500 
     sigma_multiplier: float = 1.0 
@@ -105,18 +105,19 @@ class ASMarketMaker(Strategy):
 
         # Configuration
         self.instrument_id = InstrumentId.from_str(config.instrument_id)
-        self.sigma_multiplier = config.sigma_multiplier 
         self.order_qty = config.order_qty 
-        self.trailing_stop = config.trailing_stop
-        self.stop_loss = config.stop_loss 
-        self.stopprofit = config.stopprofit 
-        self.stoploss_sleep = config.stoploss_sleep
-        self.period = config.period 
-        self.sigma_tick_period = config.sigma_tick_period
-        self.ema_tick_period = config.ema_tick_period 
         self.n_spreads = config.n_spreads 
         self.estimate_window = config.estimate_window 
+        self.period = config.period 
+        self.sigma_tick_period = config.sigma_tick_period
+        self.sigma_multiplier = config.sigma_multiplier 
         self.gamma = config.gamma 
+        self.ema_tick_period = config.ema_tick_period 
+        self.stop_loss = config.stop_loss 
+        self.stoploss_sleep = config.stoploss_sleep
+        self.stopprofit = config.stopprofit 
+        self.trailing_stop = config.trailing_stop
+     
 
         self.ema_array = deque(maxlen=3)
         self.wap = deque(maxlen = self.sigma_tick_period) 
@@ -137,6 +138,12 @@ class ASMarketMaker(Strategy):
     def on_start(self):
         """Actions to be performed on strategy start."""
         self.instrument = self.cache.instrument(self.instrument_id)
+
+        if self.instrument is None:
+            self.log.error(f"Could not find instrument for {self.instrument_id}")
+            self.stop()
+            return
+
         self.as_model = AvellanedaStoikov(
             self.instrument.min_quantity,
             self.n_spreads,
@@ -144,11 +151,6 @@ class ASMarketMaker(Strategy):
             self.period,
             self.clock.timestamp_ms()
         )
-
-        if self.instrument is None:
-            self.log.error(f"Could not find instrument for {self.instrument_id}")
-            self.stop()
-            return
 
         self.subscribe_order_book_deltas(
             instrument_id=self.instrument.id,
@@ -184,7 +186,7 @@ class ASMarketMaker(Strategy):
             + self._book.best_ask_price * self._book.best_bid_qty) /(self._book.best_ask_qty + self._book.best_bid_qty)
         )
         self.imb.append(self._book.best_bid_qty / (self._book.best_ask_qty + self._book.best_bid_qty))
-        self.spread.append((self._book.best_ask_price - self._book.best_bid_price) / self.wap[-1])
+        self.spread.append(self._book.spread()/ self.wap[-1])
         self.tv.append(abs(self.wap[-1] / self.wap[0] - 1.0) + self.spread[-1] / self.wap[-1])
         self.ema.update_raw(self.wap[-1]) 
         self.ema_array.append(self.ema.value)
@@ -196,8 +198,8 @@ class ASMarketMaker(Strategy):
             self._book.ts_last / 10**6
             )
         
-        ## make sure the model hase been initlized 
-        if len(self.wap) < self.sigma_tick_period  or (not self.ema.initlized) or (not self.as_model.initlized):
+        ## make sure the model hase been initialized
+        if len(self.wap) < self.sigma_tick_period  or (not self.ema.initialized) or (not self.as_model.initialized):
             return 
 
         self.buy_a = buy_a + epsilon 
@@ -219,6 +221,7 @@ class ASMarketMaker(Strategy):
             if (self.unrealized_pnl > self.trailing_stop) and (self.timer <  self._book.ts_last / 10**9 -10):
                 self.active_trailing_stop = True 
             if self.active_trailing_stop and (self.unrealized_pnl < self.trailing_stop):
+                self.cancel_all_orders(self.instrument.id)
                 self.close_all_positions(self.instrument.id)
                 self.unrealized_pnl = 0.0  
                 self.active_trailing_stop = False 
@@ -343,7 +346,6 @@ class ASMarketMaker(Strategy):
 
     def on_stop(self):
         """Actions to be performed when the strategy is stopped."""
-        if self.instrument is None:
-            return
+        self.unsubscribe_order_book_deltas(self.instrument.id)
         self.cancel_all_orders(self.instrument.id)
         self.close_all_positions(self.instrument.id)
