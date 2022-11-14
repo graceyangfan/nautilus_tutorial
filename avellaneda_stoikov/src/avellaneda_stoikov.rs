@@ -59,12 +59,12 @@ impl AvellanedaStoikov {
         let can_get = self.ie.on_tick(bid, ask, ts);
         // wait to get more data
         if can_get && ts > self.start_time + self.estimate_window + 1{
-            self.initialized= True;
+            self.initialized= true;
             let ii = self.ie.estimate(ts);
             return ii.get_ak();
         }
         else{
-            self.initialized= False;
+            self.initialized= false;
             (0.0,0.0,0.0,0.0)
         }
     }

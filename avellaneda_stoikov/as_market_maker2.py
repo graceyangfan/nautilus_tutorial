@@ -24,7 +24,8 @@ from nautilus_trader.model.enums import OrderSide
 from nautilus_trader.model.enums import TimeInForce
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments.base import Instrument
-from nautilus_trader.model.data.tick import QuoteTick
+from nautilus_trader.model.orderbook.book import OrderBook
+from nautilus_trader.model.orderbook.data import OrderBookData
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.events.position import PositionChanged
 from nautilus_trader.model.events.position import PositionClosed
@@ -131,8 +132,8 @@ class ASMarketMaker(Strategy):
         self.entry_price = 0 
         self.unrealized_pnl  = 0 
         self.in_stoploss = False 
-        self.active_trailling_stop = False  
-        self._quoteticker = None 
+        self.active_trailling_stop = False 
+        self._book = None  # type: Optional[OrderBook]
 
     def on_start(self):
         """Actions to be performed on strategy start."""
@@ -151,50 +152,49 @@ class ASMarketMaker(Strategy):
             self.clock.timestamp_ms()
         )
 
-        self.subscribe_quote_ticks(self.instrument_id)
+        self.subscribe_order_book_deltas(
+            instrument_id=self.instrument.id,
+            book_type=BookType.L1_TBBO,
+        )
+        self._book = OrderBook.create(
+            instrument=self.instrument,
+            book_type=BookType.L1_TBBO,
+        )
 
+    def on_order_book_delta(self, data: OrderBookData):
+        """Actions to be performed when a delta is received."""
+        self._book.apply(data)
+        if self._book.spread():
+            self.on_tick() 
+
+    def on_order_book(self, order_book: OrderBook):
+        """Actions to be performed when an order book update is received."""
+        self._book = order_book
+        if self._book.spread():
+            self.on_tick() 
 
     def on_event(self, event: Event):
         if isinstance(event, (PositionOpened, PositionChanged)):
-            self.position_amount = float(event.quantity)
-            self.entry_price = float(event.avg_px_open)
+            self.position_amount = event.quantity
+            self.entry_price = event.avg_px_open
 
-    def on_quote_tick(self, tick: QuoteTick):
-        """
-        Actions to be performed when the strategy is running and receives a quote tick.
-
-        Parameters
-        ----------
-        tick : QuoteTick
-            The tick received.
-
-        """
+    def on_tick(self):
         ##update data 
-        
-        self.log.info(f"current quoteticker {tick.ask},{tick.bid}")
         self.wap.append( 
-           float(
-             (tick.bid * tick.ask_size \
-            + tick.ask * tick.bid_size) /(tick.ask_size + tick.bid_size)
-           )
+            (self._book.best_bid_price * self._book.best_ask_qty \
+            + self._book.best_ask_price * self._book.best_bid_qty) /(self._book.best_ask_qty + self._book.best_bid_qty)
         )
-        self.imb.append(
-            float(
-            tick.bid_size / (tick.ask_size + tick.bid_size)
-            )
-        )
-        self.spread.append(
-            float(tick.ask - tick.bid) / self.wap[-1]
-        )
+        self.imb.append(self._book.best_bid_qty / (self._book.best_ask_qty + self._book.best_bid_qty))
+        self.spread.append(self._book.spread()/ self.wap[-1])
         self.tv.append(abs(self.wap[-1] / self.wap[0] - 1.0) + self.spread[-1] / self.wap[-1])
         self.ema.update_raw(self.wap[-1]) 
         self.ema_array.append(self.ema.value)
 
 
         buy_a, buy_k, sell_a, sell_k = self.as_model.calculate_intensity_info(
-            tick.ask,
-            tick.bid,
-            int(tick.ts_event / 10**6)
+            self._book.best_ask_price,
+            self._book.best_bid_price,
+            self._book.ts_last / 10**6
             )
         
         ## make sure the model hase been initialized
@@ -215,21 +215,21 @@ class ASMarketMaker(Strategy):
 
         if not self.in_stoploss:
             if self.position_amount > 0 :
-                self.unrealized_pnl = tick.bid / self.entry_price  - 1.0
+                self.unrealized_pnl = self._book.best_bid_price / self.entry_price  - 1.0
             elif self.position_amount < 0:
-                self.unrealized_pnl = 1.0 - tick.ask / self.entry_price 
+                self.unrealized_pnl = 1.0 - self._book.best_ask_price / self.entry_price 
             else:
                 self.unrealized_pnl = 0.0 
 
             ## try to stop profit 
-            if (self.unrealized_pnl > self.trailling_stop) and (self.timer <  tick.ts_event / 10**9 -10):
+            if (self.unrealized_pnl > self.trailling_stop) and (self.timer <  self._book.ts_last / 10**9 -10):
                 self.active_trailling_stop = True 
             if self.active_trailling_stop and (self.unrealized_pnl < self.trailling_stop):
                 self.cancel_all_orders(self.instrument.id)
                 self.close_all_positions(self.instrument.id)
                 self.unrealized_pnl = 0.0  
                 self.active_trailling_stop = False 
-                self.timer =  tick.ts_event / 10**9
+                self.timer =  self._book.ts_last / 10**9
             
             # try to stop loss 
             if self.unrealized_pnl < -self.stop_loss:
@@ -238,23 +238,23 @@ class ASMarketMaker(Strategy):
                 self.in_stoploss = True 
                 self.unrealized_pnl = 0.0  
                 self.active_trailling_stop = False 
-                self.timer =  tick.ts_event / 10**9
+                self.timer =  self._book.ts_last / 10**9
             #try to stop profit 
-            elif self.unrealized_pnl > self.stopprofit and  (self.timer <= tick.ts_event / 10**9  - self.period / 10**3):
+            elif self.unrealized_pnl > self.stopprofit and  (self.timer <= self._book.ts_last / 10**9  - self.period / 10**3):
                 self.cancel_all_orders(self.instrument.id)
                 self.close_all_positions(self.instrument.id)
                 self.unrealized_pnl = 0.0  
-                self.timer =  tick.ts_event / 10**9
+                self.timer =  self._book.ts_last / 10**9
 
-            elif  (self.timer <= tick.ts_event / 10**9  - self.period / 10**3):
+            elif  (self.timer <= self._book.ts_last / 10**9  - self.period / 10**3):
                 sell_price = self.wap[-1] + spread_ask 
                 buy_price = self.wap[-1] - spread_bid 
 
                 self.buy(buy_price, self.order_qty)
                 self.sell(sell_price, self.order_qty) 
-                self.timer =  tick.ts_event / 10**9
+                self.timer =  self._book.ts_last / 10**9
 
-        elif self.timer <= tick.ts_event / 10**9 - self.stoploss_sleep:
+        elif self.timer <= self._book.ts_last / 10**9 - self.stoploss_sleep:
             self.in_stoploss = False 
     
 
@@ -350,6 +350,6 @@ class ASMarketMaker(Strategy):
 
     def on_stop(self):
         """Actions to be performed when the strategy is stopped."""
-        self.unsubscribe_quote_ticks(self.instrument_id)
+        self.unsubscribe_order_book_deltas(self.instrument.id)
         self.cancel_all_orders(self.instrument.id)
         self.close_all_positions(self.instrument.id)
