@@ -49,6 +49,11 @@ impl AvellanedaStoikov {
         }
     }
 
+    pub fn initialized(&self) -> bool 
+    {
+        self.initialized
+    }
+
     pub fn calculate_intensity_info(
         &mut self, 
         ask: f64, 
@@ -105,6 +110,7 @@ mod tests {
             10040,
         );
         println!("{:?}",info);
+        println!("{has it initlized?}",as_ex.initialized());
     }
 
 }

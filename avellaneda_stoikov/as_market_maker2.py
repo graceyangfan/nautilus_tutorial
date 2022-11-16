@@ -145,27 +145,24 @@ class ASMarketMaker(Strategy):
             return
 
         self.as_model = AvellanedaStoikov(
-            self.instrument.min_quantity,
+            self.instrument.price_increment,
             self.n_spreads,
             self.estimate_window,
             self.period,
             self.clock.timestamp_ms()
         )
 
-        self.subscribe_order_book_deltas(
+        self.subscribe_order_book_snapshots(
             instrument_id=self.instrument.id,
-            book_type=BookType.L1_TBBO,
+            book_type=BookType.L2_MBP,
+            depth=5, 
+            interval_ms=100
         )
         self._book = OrderBook.create(
             instrument=self.instrument,
-            book_type=BookType.L1_TBBO,
+            book_type=BookType.L2_MBP,
         )
 
-    def on_order_book_delta(self, data: OrderBookData):
-        """Actions to be performed when a delta is received."""
-        self._book.apply(data)
-        if self._book.spread():
-            self.on_tick() 
 
     def on_order_book(self, order_book: OrderBook):
         """Actions to be performed when an order book update is received."""
@@ -181,10 +178,10 @@ class ASMarketMaker(Strategy):
     def on_tick(self):
         ##update data 
         self.wap.append( 
-            (self._book.best_bid_price * self._book.best_ask_qty \
-            + self._book.best_ask_price * self._book.best_bid_qty) /(self._book.best_ask_qty + self._book.best_bid_qty)
+            (self._book.best_bid_price() * self._book.best_ask_qty() \
+            + self._book.best_ask_price() * self._book.best_bid_qty()) /(self._book.best_ask_qty() + self._book.best_bid_qty())
         )
-        self.imb.append(self._book.best_bid_qty / (self._book.best_ask_qty + self._book.best_bid_qty))
+        self.imb.append(self._book.best_bid_qty() / (self._book.best_ask_qty() + self._book.best_bid_qty()))
         self.spread.append(self._book.spread()/ self.wap[-1])
         self.tv.append(abs(self.wap[-1] / self.wap[0] - 1.0) + self.spread[-1] / self.wap[-1])
         self.ema.update_raw(self.wap[-1]) 
@@ -192,13 +189,13 @@ class ASMarketMaker(Strategy):
 
 
         buy_a, buy_k, sell_a, sell_k = self.as_model.calculate_intensity_info(
-            self._book.best_ask_price,
-            self._book.best_bid_price,
-            self._book.ts_last / 10**6
+            self._book.best_ask_price(),
+            self._book.best_bid_price(),
+            int(self._book.ts_last / 10**6)
             )
         
         ## make sure the model hase been initialized
-        if len(self.wap) < self.sigma_tick_period  or (not self.ema.initialized) or (not self.as_model.initialized):
+        if len(self.wap) < self.sigma_tick_period  or (not self.ema.initialized) or (not self.as_model.initialized()):
             return 
 
         self.buy_a = buy_a + sys.float_info.epsilon
@@ -209,15 +206,15 @@ class ASMarketMaker(Strategy):
         spread_ask, spread_bid = self.calculate_spread() 
 
         self.log.info(f"current as estimate are {buy_a},{buy_k},{sell_a},{sell_k}")
-        self.log.ingo(f"current spread are {spread_ask},{spread_bid}")
-        self.log.ingo(f"current postions are ampount:{self.position_amount},price:{self.entry_price}")
+        self.log.info(f"current spread are {spread_ask},{spread_bid}")
+        self.log.info(f"current postions are ampount:{self.position_amount},price:{self.entry_price}")
 
 
         if not self.in_stoploss:
             if self.position_amount > 0 :
-                self.unrealized_pnl = self._book.best_bid_price / self.entry_price  - 1.0
+                self.unrealized_pnl = self._book.best_bid_price() / self.entry_price  - 1.0
             elif self.position_amount < 0:
-                self.unrealized_pnl = 1.0 - self._book.best_ask_price / self.entry_price 
+                self.unrealized_pnl = 1.0 - self._book.best_ask_price() / self.entry_price 
             else:
                 self.unrealized_pnl = 0.0 
 
@@ -249,6 +246,9 @@ class ASMarketMaker(Strategy):
             elif  (self.timer <= self._book.ts_last / 10**9  - self.period / 10**3):
                 sell_price = self.wap[-1] + spread_ask 
                 buy_price = self.wap[-1] - spread_bid 
+                self.log.info(f'current wap is {self.wap[-1]}')
+                self.log.info(f'current spread ask is {spread_ask}')
+                self.log.info(f'current spread bid is {spread_bid}')
 
                 self.buy(buy_price, self.order_qty)
                 self.sell(sell_price, self.order_qty) 
@@ -261,6 +261,7 @@ class ASMarketMaker(Strategy):
     def calculate_spread(self):
         
         self.sigma = self.calculate_gk_volatility()
+        self.log.info(f"current sigma is {self.sigma}")
         sigma_fix = self.sigma * self.sigma_multiplier
         q_fix = self.position_amount / self.order_qty
 
@@ -291,7 +292,7 @@ class ASMarketMaker(Strategy):
     def calculate_gk_volatility(self):
 
         wap_vec = np.array(self.wap) 
-        t = 10.0 
+        t = 0 
         garman_klass_hv = 0. 
         step = 30 
         for i in range(0,len(wap_vec) - step,step):
@@ -299,6 +300,7 @@ class ASMarketMaker(Strategy):
             hl = np.log(max(wap_vec[i:i+step]) / min (wap_vec[i:i+step]))
             res = 0.5 * np.power(hl, 2) - (2.0* np.log(2) -1.0) * np.power(co, 2)
             garman_klass_hv += res
+            t = t + 1
         
         return np.sqrt(garman_klass_hv / t)
 
@@ -312,7 +314,6 @@ class ASMarketMaker(Strategy):
             order_side=OrderSide.BUY,
             quantity=self.instrument.make_qty(quantity),
             price=self.instrument.make_price(price),
-            time_in_force=TimeInForce.GTX,
             post_only=True,  # default value is True
             # display_qty=self.instrument.make_qty(self.trade_size / 2),  # iceberg
         )
@@ -328,7 +329,6 @@ class ASMarketMaker(Strategy):
             order_side=OrderSide.SELL,
             quantity=self.instrument.make_qty(quantity),
             price=self.instrument.make_price(price),
-            time_in_force=TimeInForce.GTX,
             post_only=True,  # default value is True
             # display_qty=self.instrument.make_qty(self.trade_size / 2),  # iceberg
         )
@@ -350,6 +350,6 @@ class ASMarketMaker(Strategy):
 
     def on_stop(self):
         """Actions to be performed when the strategy is stopped."""
-        self.unsubscribe_order_book_deltas(self.instrument.id)
+        self.unsubscribe_order_book_snapshots(self.instrument.id)
         self.cancel_all_orders(self.instrument.id)
         self.close_all_positions(self.instrument.id)
