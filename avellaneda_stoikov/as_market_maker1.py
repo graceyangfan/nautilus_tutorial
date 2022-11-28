@@ -13,12 +13,17 @@
 #  limitations under the License.
 # -------------------------------------------------------------------------------------------------
 
+
+import datetime
 import numpy as np 
 import sys 
 from decimal import Decimal
 from typing import Optional
 from collections import deque 
 from nautilus_trader.config import StrategyConfig
+from nautilus_trader.core.data import Data
+from nautilus_trader.model.data.bar import Bar
+from nautilus_trader.model.data.bar import BarType
 from nautilus_trader.model.enums import BookType
 from nautilus_trader.model.enums import OrderSide
 from nautilus_trader.model.enums import TimeInForce
@@ -35,6 +40,20 @@ from nautilus_trader.model.orders.limit import LimitOrder
 from nautilus_trader.indicators.average.ema import ExponentialMovingAverage 
 from avellaneda_stoikov.avellaneda_stoikov import AvellanedaStoikov 
 
+
+from nautilus_trader.czsc.enums import (
+    DivergenceType,
+    Mark,
+    Direction,
+    BIType,
+    LineType,
+    TradePointType,
+    ZSProcessType,
+    SupportType
+)
+from nautilus_trader.czsc.twist import TwistConfig,Twist
+from nautilus_trader.czsc.base_object import BI, LINE 
+from nautilus_trader.czsc.utils import last_confirm_line 
 
 # *** THIS IS A TEST STRATEGY WITH NO ALPHA ADVANTAGE WHATSOEVER. ***
 # *** IT IS NOT INTENDED TO BE USED TO TRADE LIVE WITH REAL MONEY. ***
@@ -75,7 +94,7 @@ class ASMarketMakerConfig(StrategyConfig):
     """
 
     instrument_id: str
-    
+    bar_type: str
     order_qty: float = 1 
     n_spreads: int = 10 
     estimate_window: int = 600000
@@ -83,11 +102,12 @@ class ASMarketMakerConfig(StrategyConfig):
     sigma_tick_period: int = 500 
     sigma_multiplier: float = 1.0 
     gamma: float = 0.2 
-    ema_tick_period: int = 200 
+    #ema_tick_period: int = 200 
     stop_loss: float = 0.00618  
     stoploss_sleep: int = 300000
     stopprofit: float = 0.00618 
     trailling_stop: float = 0.00382 
+    request_bar_days: int = 10 
 
 
 class ASMarketMaker(Strategy):
@@ -105,6 +125,8 @@ class ASMarketMaker(Strategy):
 
         # Configuration
         self.instrument_id = InstrumentId.from_str(config.instrument_id)
+        self.bar_type = BarType.from_str(config.bar_type)
+        self.request_bar_days = config.request_bar_days 
         self.order_qty = config.order_qty 
         self.n_spreads = config.n_spreads 
         self.estimate_window = config.estimate_window 
@@ -112,19 +134,19 @@ class ASMarketMaker(Strategy):
         self.sigma_tick_period = config.sigma_tick_period
         self.sigma_multiplier = config.sigma_multiplier 
         self.gamma = config.gamma 
-        self.ema_tick_period = config.ema_tick_period 
+        #self.ema_tick_period = config.ema_tick_period 
         self.stop_loss = config.stop_loss 
         self.stoploss_sleep = config.stoploss_sleep
         self.stopprofit = config.stopprofit 
         self.trailling_stop = config.trailling_stop
      
 
-        self.ema_array = deque(maxlen=3)
+        #self.ema_array = deque(maxlen=3)
         self.wap = deque(maxlen = self.sigma_tick_period) 
         self.imb = deque(maxlen = self.sigma_tick_period) 
         self.spread = deque(maxlen = self.sigma_tick_period) 
         self.tv = deque(maxlen = self.sigma_tick_period) 
-        self.ema = ExponentialMovingAverage(config.ema_tick_period)
+        #self.ema = ExponentialMovingAverage(config.ema_tick_period)
         self.as_model: Optional[AvellanedaStoikov] = None  
         self.instrument: Optional[Instrument] = None
         self.timer = 0 
@@ -135,8 +157,13 @@ class ASMarketMaker(Strategy):
         self.active_trailling_stop = False 
         self._book = None  # type: Optional[OrderBook]
 
-        self.direction = 0 
 
+        self.twist_config = TwistConfig(
+        instrument_id=config.instrument_id,
+        bar_type=config.bar_type,
+        )
+        self.twist = Twist(self.twist_config)
+        self.direction = 0 
     def on_start(self):
         """Actions to be performed on strategy start."""
         self.instrument = self.cache.instrument(self.instrument_id)
@@ -156,16 +183,50 @@ class ASMarketMaker(Strategy):
 
         self.subscribe_order_book_snapshots(
             instrument_id=self.instrument.id,
-            book_type=BookType.L2_MBP,
-            depth=5, 
+            book_type=BookType.L1_TBBO,
+            #depth=5, 
             interval_ms=1000
         )
         self._book = OrderBook.create(
             instrument=self.instrument,
-            book_type=BookType.L2_MBP,
+            book_type=BookType.L1_TBBO,
         )
 
+        ## twist 
+        self.twist.on_start(self)
+        # Get historical data
+        from_datetime = datetime.datetime.utcnow() -datetime.timedelta(days=self.request_bar_days)
+        self.request_bars(
+            bar_type=self.bar_type,
+            from_datetime = from_datetime,
+            )
+        #subscribe real data 
+        self.subscribe_bars(self.bar_type)
 
+    def on_historical_data(self, data: Data):
+        """
+        preprocessing bars.
+        """
+        if isinstance(data, Bar):
+            self.twist.on_bar(data) 
+
+    def on_bar(self, bar: Bar):
+        self.on_historical_data(bar)
+        ## predict directions with twist bars 
+        if len(self.twist.xds) < 1:
+            return 
+        last_xd = self.twist.xds[-1] 
+        self.last_done_bi = last_confirm_line(self.twist.bis)
+        if last_xd.divergence_type_exists([DivergenceType.OSCILLATION,DivergenceType.TREND]) and last_xd.direction_type == Direction.DOWN and self.last_done_bi.direction_type == Direction.UP:
+            self.direction = 1 
+        elif last_xd.direction_type == Direction.UP and not last_xd.divergence_type_exists([DivergenceType.OSCILLATION,DivergenceType.TREND]) and self.last_done_bi.direction_type == Direction.UP:
+            self.direction = 1 
+        elif last_xd.divergence_type_exists([DivergenceType.OSCILLATION,DivergenceType.TREND]) and last_xd.direction_type == Direction.UP and self.last_done_bi.direction_type == Direction.DOWN:
+            self.direction = -1 
+        elif last_xd.direction_type == Direction.DOWN and not last_xd.divergence_type_exists([DivergenceType.OSCILLATION,DivergenceType.TREND]) and self.last_done_bi.direction_type == Direction.DOWN:
+            self.direction = -1 
+        else:
+            self.direction = 0 
 
     def on_order_book(self, order_book: OrderBook):
         """Actions to be performed when an order book update is received."""
@@ -187,8 +248,8 @@ class ASMarketMaker(Strategy):
         self.imb.append(self._book.best_bid_qty() / (self._book.best_ask_qty() + self._book.best_bid_qty()))
         self.spread.append(self._book.spread()/ self.wap[-1])
         self.tv.append(abs(self.wap[-1] / self.wap[0] - 1.0) + self.spread[-1] / self.wap[-1])
-        self.ema.update_raw(self.wap[-1]) 
-        self.ema_array.append(self.ema.value)
+        #self.ema.update_raw(self.wap[-1]) 
+        #self.ema_array.append(self.ema.value)
         
         buy_a, buy_k, sell_a, sell_k = self.as_model.calculate_intensity_info(
             self._book.best_ask_price(),
@@ -197,7 +258,7 @@ class ASMarketMaker(Strategy):
             )
 
         ## make sure the model hase been initialized
-        if len(self.wap) < self.sigma_tick_period  or (not self.ema.initialized) or (not self.as_model.initialized()):
+        if len(self.wap) < self.sigma_tick_period or (not self.as_model.initialized())  or len(self.twist.xds) < 1:
             return         
 
         self.buy_a = buy_a + sys.float_info.epsilon
@@ -254,7 +315,7 @@ class ASMarketMaker(Strategy):
                 self.log.info(f'current wap is {self.wap[-1]}')
                 self.log.info(f'current spread ask is {spread_ask}')
                 self.log.info(f'current spread bid is {spread_bid}')
-
+    
                 if  self.portfolio.is_flat(self.instrument_id) and self.direction > 0:
                     self.buy(buy_price, self.order_qty)
                     self.timer =  self._book.ts_last / 10**9
@@ -292,17 +353,13 @@ class ASMarketMaker(Strategy):
             )
 
         # direction_long 
-        if self.ema_array[-1] > self.ema_array[-2] and self.ema_array[-2] > self.ema_array[-3]:
-            self.direction = 1 
+        if self.direction > 0 :
             ask = ask * 1.618
             bid = bid * 0.618
         # direction short 
-        elif self.ema_array[-1] < self.ema_array[-2] and self.ema_array[-2] < self.ema_array[-3]:
-            self.direction = -1 
+        elif self.direction < 0 :
             ask = ask * 0.618
             bid = bid * 1.618
-        else:
-            self.direction = 0 
         
         return ask,bid 
 
@@ -373,15 +430,17 @@ class ASMarketMaker(Strategy):
         Actions to be performed when the strategy is reset.
         """
         # Reset indicators here
-        self.ema_array.clear()
+        #self.ema_array.clear()
         self.wap.clear()
         self.imb.clear()
         self.spread.clear()
         self.tv.clear()
-        self.ema.reset() 
+        self.twist.on_reset()
+        #self.ema.reset() 
 
     def on_stop(self):
         """Actions to be performed when the strategy is stopped."""
         self.unsubscribe_order_book_snapshots(self.instrument.id)
+        self.unsubscribe_bars(self.bar_type)
         self.cancel_all_orders(self.instrument.id)
         self.close_all_positions(self.instrument.id)
