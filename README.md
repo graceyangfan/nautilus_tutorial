@@ -1,5 +1,5 @@
 # nautilus_tutorial
 Examples of nautilus script
 
-avellaneda_stoikov
-a corrected version from https://github.com/zhenpingfeng/burgerflipper to bindge to python model.
+(1)avellaneda_stoikov
+  A corrected version from https://github.com/zhenpingfeng/burgerflipper to bindge to python model.
