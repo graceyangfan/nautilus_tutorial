@@ -43,6 +43,8 @@ async def write_all_instruments(key,secret,instrument_id = "BTCUSDT.BINANCE"):
 
 if __name__ == "__main__":
     global data 
-    with open('config.json') as f:
-        data = json.load(f)
-    asyncio.run(write_all_instruments(data["api_key"],data["secret_key"]))
+    with open("config.json", 'r') as f:
+        api_key_data = json.load(f)
+    api_key = api_key_data['api_key']
+    api_secret = api_key_data['api_secret']
+    asyncio.run(write_all_instruments(api_key,api_secret))
