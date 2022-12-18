@@ -11,7 +11,7 @@ from nautilus_trader.adapters.binance.http.client import BinanceHttpClient
 from nautilus_trader.backtest.data.wranglers import TradeTickDataWrangler
 from nautilus_trader.common.clock import LiveClock, TestClock
 from nautilus_trader.common.logging import Logger 
-from nautilus_trader.data.aggregation import VolumeBarAggregator
+from nautilus_trader.data.aggregation import ValueBarAggregator
 from nautilus_trader.model.data.bar import BarSpecification, BarType
 from nautilus_trader.model.enums import AggressorSide, BarAggregation, PriceType
 from nautilus_trader.model.identifiers import InstrumentId
@@ -66,7 +66,7 @@ def ts_parser(time_in_secs: str) -> datetime:
     return datetime.utcfromtimestamp(int(time_in_secs) / 1_000.0)
 
 
-def aggregate_volumebar(instrument, filename, threshold):
+def aggregate_valuebar(instrument, filename, threshold):
     """Aggregates trade tick data into volume bars of a specified threshold."""
     if not instrument:
         return []
@@ -92,9 +92,9 @@ def aggregate_volumebar(instrument, filename, threshold):
     handler = [] 
     bar_spec = BarSpecification(threshold, BarAggregation.VOLUME, PriceType.LAST)
     bar_type = BarType(instrument.id, bar_spec)
-    aggregator = VolumeBarAggregator(instrument, bar_type, handler.append, Logger(clock))
+    aggregator = ValueBarAggregator(instrument, bar_type, handler.append, Logger(clock))
 
-    # Iterate over trade ticks and process through VolumeBarAggregator
+    # Iterate over trade ticks and process through ValueBarAggregator
     for tick in ticks:
         aggregator.handle_trade_tick(tick)
 
@@ -109,7 +109,7 @@ def main():
     parser.add_argument('--filename', default="../../example_data/BTCBUSD-trades-2022-12.csv")
     parser.add_argument('--symbol', default='BTCBUSD')
     parser.add_argument("--venue",default='BINANCE') 
-    parser.add_argument('--threshold', type=int, default=10)
+    parser.add_argument('--threshold', type=int, default=600000)
     parser.add_argument('--api_key_file', default = "config.json")
     parser.add_argument('--account_type', default=BinanceAccountType.FUTURES_USDT)
     args = parser.parse_args()
@@ -125,7 +125,7 @@ def main():
     #instrument = asyncio.run(get_instrument(instrument_id , api_key, api_secret, args.account_type))
     instrument = catalog.instruments(instrument_ids=[instrument_id],as_nautilus=True)[0]
     # Aggregate trade tick data into volume bars
-    volume_bars = aggregate_volumebar(instrument, args.filename, args.threshold)
+    volume_bars = aggregate_valuebar(instrument, args.filename, args.threshold)
 
     # Write volume bars to catalog
     if len(volume_bars) > 0:
