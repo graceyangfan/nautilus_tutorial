@@ -67,7 +67,7 @@ def ts_parser(time_in_secs: str) -> datetime:
 
 
 def aggregate_valuebar(instrument, filename, threshold):
-    """Aggregates trade tick data into volume bars of a specified threshold."""
+    """Aggregates trade tick data into dolar bars of a specified threshold."""
     if not instrument:
         return []
 
@@ -87,10 +87,10 @@ def aggregate_valuebar(instrument, filename, threshold):
         print(f"Failed to process trade tick data: {e}")
         return []
 
-    # Set up clock, logger, and handler for volume bar aggregation
+    # Set up clock, logger, and handler for dolar bar aggregation
     clock = TestClock()
     handler = [] 
-    bar_spec = BarSpecification(threshold, BarAggregation.VOLUME, PriceType.LAST)
+    bar_spec = BarSpecification(threshold, BarAggregation.VALUE, PriceType.LAST)
     bar_type = BarType(instrument.id, bar_spec)
     aggregator = ValueBarAggregator(instrument, bar_type, handler.append, Logger(clock))
 
@@ -124,12 +124,12 @@ def main():
     # Get the instrument for the given symbol
     #instrument = asyncio.run(get_instrument(instrument_id , api_key, api_secret, args.account_type))
     instrument = catalog.instruments(instrument_ids=[instrument_id],as_nautilus=True)[0]
-    # Aggregate trade tick data into volume bars
-    volume_bars = aggregate_valuebar(instrument, args.filename, args.threshold)
+    # Aggregate trade tick data into dolar bars
+    dolar_bars = aggregate_valuebar(instrument, args.filename, args.threshold)
 
-    # Write volume bars to catalog
-    if len(volume_bars) > 0:
-        write_objects(catalog, chunk = volume_bars)
+    # Write dolar bars to catalog
+    if len(dolar_bars) > 0:
+        write_objects(catalog, chunk = dolar_bars)
         #write_objects(catalog, chunk = [instrument])
 
 if __name__ == "__main__":

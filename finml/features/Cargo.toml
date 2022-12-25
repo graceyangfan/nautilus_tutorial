@@ -5,8 +5,9 @@ authors = ["yfclark"]
 edition = "2021"
 
 [dependencies]
-pyo3 = "0.12"
+pyo3 = { version = "0.16.5", features = ["extension-module"] }
 approx = "0.3"
 
 [lib]
+name = "features"
 crate-type = ["cdylib"]
