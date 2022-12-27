@@ -28,6 +28,7 @@ pub fn get_weights(order: f64,  max_width: usize, threshold: f64) -> Vec<f64> {
 #[pymethods]
 impl FracDiff {
     #[new]
+    #[args(threshold = "1e-5")]
     pub fn new(order: f64, period: usize, threshold: f64) -> Self {
         let weights = get_weights(order, period, threshold);
         Self {
@@ -43,10 +44,13 @@ impl FracDiff {
         self.input_array.push_back(input);
         if self.input_array.len() >= self.period {
             self.initialized = true;
+        }
+        if self.input_array.len() >=self.period + 1
+        {
+            self.input_array.pop_front();
             let dot_product = self.input_array.iter().zip(self.weights.iter())
             .fold(0.0, |acc, (x, y)| acc + x * y);
             self.value = dot_product;
-            self.input_array.pop_front();
         }
     }
 
