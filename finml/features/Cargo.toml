@@ -7,6 +7,8 @@ edition = "2021"
 [dependencies]
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
 approx = "0.3"
+nalgebra = "0.31.4"
+statrs = "0.13"
 
 [lib]
 name = "features"
