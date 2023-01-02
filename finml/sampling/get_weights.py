@@ -34,9 +34,9 @@ def count_events_per_bar(bar_times, event_times):
             "values": np.zeros(event_times_iloc2-event_times_iloc1 + 1)
         }
     )
-    for i in range(event_times.shape[0]):
+    for event_starts,event_ends in event_times.iterrows():
         res = res.with_column(
-            pl.when((pl.col("index") >= event_times[i,"event_starts"]) & (pl.col("index") <= event_times[i,"event_ends"]))
+            pl.when((pl.col("index") >= event_starts) & (pl.col("index") <= event_ends))
             .then(pl.col("values")+1)
             .otherwise(pl.col("values"))
             .alias("values")
@@ -55,10 +55,10 @@ def label_avg_uniqueness(bars, events):
             "values": np.zeros(events.shape[0])
         }
     )
-    for i in range(events.shape[0]):
+    for event_starts,event_ends in events.iterrows():
         res = res.with_column(
-            pl.when((pl.col("index") == events[i,"event_starts"]))
-            .then((1.0 / events_counts.filter((pl.col("index")>= events[i,"event_starts"])&(pl.col("index")<=events[i,"event_ends"]))["values"]).mean())
+            pl.when((pl.col("index") == event_starts))
+            .then((1.0 / events_counts.filter((pl.col("index")>= event_starts)&(pl.col("index")<=event_ends))["values"]).mean())
             .otherwise(pl.col("values"))
             .alias("values")
             )
@@ -105,7 +105,8 @@ def sample_sequential_bootstrap(event_indicators, size=None):
                 [pl.col(new_samples[i]).alias(str(i)) for i in range(len(new_samples))]
             )
             trial_avg_uniq[event_id]  = _get_avg_uniqueness(trial_event_indicators)[:,-1].to_numpy()[-1]
-        probs = [item/sum(trial_avg_uniq.values()) for item in trial_avg_uniq.values()]
+        trial_avg_uniq_sum = sum(trial_avg_uniq.values())
+        probs = [item / trial_avg_uniq_sum for item in trial_avg_uniq.values()]
         samples += [np.random.choice(event_indicators.columns, p=probs)]
     return samples
 
@@ -117,14 +118,14 @@ def _get_return_attributions(event_times, events_counts, bars):
             "values": np.zeros(event_times.shape[0])
         }
     )
-    for i in range(event_times.shape[0]):
+    for event_starts,event_ends in event_times.iterrows():
         return_attributed = returns.filter(
-            (pl.col("index")>=event_times[i,"event_starts"]) & (pl.col("index")<=event_times[i,"event_ends"]) 
+            (pl.col("index")>=event_starts) & (pl.col("index")<=event_ends) 
         )["values"] / events_counts.filter(
-            (pl.col("index")>=event_times[i,"event_starts"]) & (pl.col("index")<=event_times[i,"event_ends"]) 
+            (pl.col("index")>=event_starts) & (pl.col("index")<=event_ends) 
         )["values"]
         weights = weights.with_column(
-            pl.when(pl.col("index") == event_times[i,"event_starts"])
+            pl.when(pl.col("index") == event_starts)
             .then(return_attributed.sum()).otherwise(pl.col("values")).alias("values")
         )
     weights = weights.select(
