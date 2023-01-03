@@ -1,6 +1,5 @@
 import numpy as np
 import polars as pl 
-from sklearn.metrics import log_loss, accuracy_score
 
 def _get_purged_train_indices(event_times, test_times ):
     event_times = event_times.select(
