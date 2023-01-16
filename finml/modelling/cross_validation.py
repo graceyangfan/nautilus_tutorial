@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl 
 
-def _get_purged_train_indices(event_times, test_times ):
+def _get_purged_train_indices(event_times, test_times):
     event_times = event_times.select(
         [pl.all(), pl.arange(0, pl.count()).alias("count_index")]
     )
@@ -23,12 +23,12 @@ def _get_embargo_times(bar_times, embargo_pct):
     
     step = 0 if bar_times is None else int(len(bar_times) * embargo_pct)
     if step == 0:
-        res = pl.DataFrame({"start":bar_times,"end":bar_times})
+        res = pl.DataFrame({"event_starts":bar_times,"event_ends":bar_times})
     else:
         res = pl.concat([
-            pl.DataFrame({"start":bar_times[:-step],"end":bar_times[step:]}),
+            pl.DataFrame({"event_starts":bar_times[:-step],"event_ends":bar_times[step:]}),
             pl.DataFrame(
-                {"start":bar_times[-step:],"end":[bar_times[-1] for i in range(step)]}
+                {"event_starts":bar_times[-step:],"event_ends":[bar_times[-1] for i in range(step)]}
             )
         ],how="vertical")
     return res
@@ -37,8 +37,8 @@ def _get_embargo_times(bar_times, embargo_pct):
 def apply_purging_and_embargo(event_times, test_times, bar_times=None, embargo_pct=0.):
     if bar_times is not None:
         embargo_times = _get_embargo_times(bar_times, embargo_pct)
-        adj_test_times = embargo_times.join(test_times,left_on = "start",right_on="end",how="inner").select(
-            [pl.col("start_right").alias("start"),pl.col("end")]
+        adj_test_times = embargo_times.join(test_times,left_on = "event_starts",right_on="event_ends",how="inner").select(
+            [pl.col("start_right").alias("event_starts"),pl.col("event_ends")]
         )
     else:
         adj_test_times = test_times
@@ -56,7 +56,7 @@ class PurgedKFold:
 
     def split(self, event_times):
         '''
-        params: event_times: pl.DataFrame with two columns("start" and "end").
+        params: event_times: pl.DataFrame with two columns("event_starts" and "event_ends").
         '''
         num_obs = event_times.shape[0]
         indices = np.arange(num_obs)
@@ -65,12 +65,12 @@ class PurgedKFold:
 
         for i, j in test_splits:
             test_indices = indices[i:j]
-            test_start_time = event_times[i.item(),"start"]
-            train_1_indices = indices[(event_times.select("end") < test_start_time).to_numpy().flatten()]
+            test_start_time = event_times[i.item(),"event_starts"]
+            train_1_indices = indices[(event_times.select("event_ends") < test_start_time).to_numpy().flatten()]
             train_indices = train_1_indices
 
-            test_end_time = event_times[test_indices,"end"].max()[0,"end"]
-            train_2_start_idx = event_times.select("start").to_numpy().flatten().searchsorted(test_end_time, side='right') + 1
+            test_end_time = event_times[test_indices,"event_ends"].max()[0,"event_ends"]
+            train_2_start_idx = event_times.select("event_starts").to_numpy().flatten().searchsorted(test_end_time, side='right') + 1
             if train_2_start_idx < num_obs:
                 train_indices = np.concatenate((train_1_indices, indices[train_2_start_idx + embargo:]))
 

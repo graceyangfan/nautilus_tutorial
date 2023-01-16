@@ -215,6 +215,34 @@ impl MicroStructucture {
         let volatility = self.corwin_schultz_volatility(beta);
         (spread,volatility)
     }
+
+    pub fn bar_based_kyle_lambda(&self) -> f64 
+    {
+        let signed_volume = self.volume_array
+            .iter()
+            .zip(self.tick_directions.iter())
+            .map(|(x, y)| x*y).collect();
+
+        let array = self.close_diff.iter().zip(signed_volume.iter()).map(|(x, y)| x/y).collect();
+        return array.mean();
+    }
+
+    pub fn bar_based_amihud_lambda(&self) -> f64
+    {
+        let array = self.log_net_array.iter().zip(self.dollor_value_array.iter()).map(|(x, y)| x/y).collect();
+        return array.mean();
+    }
+
+    pub fn bar_based_hasbrouck_lambda(&self) ->f64 
+    {
+        let input_x = self.dollor_value_array
+            .iter()
+            .zip(self.tick_directions.iter())
+            .map(|(x,d)| x.sqrt() * d).collect();
+        let (betas,variances) = sadf::get_betas(&input_x,&self.log_net_array);
+        let array = self.log_net_array.iter().zip(self.input_x.iter()).map(|(x, y)| x/y).collect();
+        return array.mean();
+    }
   
     pub fn trades_based_kyle_lambda(&self) ->(f64, f64)
     {

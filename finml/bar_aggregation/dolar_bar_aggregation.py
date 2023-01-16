@@ -109,7 +109,7 @@ def main():
     parser.add_argument('--filename', default="../../example_data/BTCBUSD-trades-2022-12.csv")
     parser.add_argument('--symbol', default='BTCBUSD')
     parser.add_argument("--venue",default='BINANCE') 
-    parser.add_argument('--threshold', type=int, default=600000)
+    parser.add_argument('--threshold', type=int, default=60000)
     parser.add_argument('--api_key_file', default = "config.json")
     parser.add_argument('--account_type', default=BinanceAccountType.FUTURES_USDT)
     args = parser.parse_args()
@@ -120,7 +120,10 @@ def main():
         api_key_data = json.load(f)
     api_key = api_key_data['api_key']
     api_secret = api_key_data['api_secret']
-    instrument_id = f"{args.symbol}-PERP.{args.venue}"
+    if args.account_type == BinanceAccountType.FUTURES_USDT:
+        instrument_id = f"{args.symbol}-PERP.{args.venue}"
+    else:
+        raise NotImplementedError()
     # Get the instrument for the given symbol
     #instrument = asyncio.run(get_instrument(instrument_id , api_key, api_secret, args.account_type))
     instrument = catalog.instruments(instrument_ids=[instrument_id],as_nautilus=True)[0]

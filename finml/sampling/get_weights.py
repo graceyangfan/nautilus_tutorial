@@ -1,5 +1,7 @@
 import polars as pl
 import numpy as np 
+from joblib import Parallel, delayed
+from tqdm import tqdm 
 
 def drop_rare_labels(events, min_pct=0.05, min_classes=2):
     """
@@ -65,50 +67,53 @@ def label_avg_uniqueness(bars, events):
     return res
 
 
-def get_event_indicators(bar_times, event_times):
-    dict1 = {str(i):np.zeros(bar_times.shape[0]) for i in range(event_times.shape[0])}
-    dict1["index"] = bar_times["datetime"]
-    res = pl.DataFrame(dict1)
-    for i in range(event_times.shape[0]):
-        res = res.with_column(
-            pl.when((pl.col("index")>= event_times[i,"event_starts"])&(pl.col("index")<=event_times[i,"event_ends"]))
+def get_event_indicators(bar_times, event_times, njobs = 4):
+    res = bar_times.select(pl.col("datetime").alias("index"))
+    params = [{"res":res,
+               "event_starts":event_times[i,"event_starts"],
+               "event_ends":event_times[i,"event_ends"],
+              "i":i} for i in range(event_times.shape[0])]
+    indicators = Parallel(n_jobs=njobs)(delayed(_get_event_indicator)(param) for param in tqdm(params))
+    return pl.concat(indicators, how="horizontal")
+    
+def _get_event_indicator(params):
+    return  params["res"].select(
+            pl.when((pl.col("index")>= params["event_starts"])&(pl.col("index")<= params["event_ends"]))
             .then(1)
-            .otherwise(pl.col(str(i)))
-            .alias(str(i))
-            
+            .otherwise(0)
+            .alias(str(params["i"]))
         )
-    return res
-
-def _get_avg_uniqueness(event_indicators):
-    event_indicators = event_indicators.select(pl.all().exclude("index"))
-    concurrency = event_indicators.sum(axis=1)
-    uniqueness =  event_indicators/concurrency
-    uniqueness = uniqueness.fill_nan(0.0)
-    avg_uniqueness = uniqueness.select(
-        [
-            pl.col(item).filter(pl.col(item)>0.0).mean()  for item in uniqueness.columns 
-        ]
-    )
-    return avg_uniqueness
-
 
 def sample_sequential_bootstrap(event_indicators, size=None):
-    event_indicators = event_indicators.select(pl.all().exclude("index"))
     if size is None:
         size = event_indicators.shape[1]
-    samples = []
-    while len(samples) < size:
-        trial_avg_uniq = dict() 
-        for event_id in event_indicators.columns:
-            new_samples = samples+[event_id]
-            trial_event_indicators = event_indicators.select(
-                [pl.col(new_samples[i]).alias(str(i)) for i in range(len(new_samples))]
-            )
-            trial_avg_uniq[event_id]  = _get_avg_uniqueness(trial_event_indicators)[:,-1].to_numpy()[-1]
-        trial_avg_uniq_sum = sum(trial_avg_uniq.values())
-        probs = [item / trial_avg_uniq_sum for item in trial_avg_uniq.values()]
-        samples += [np.random.choice(event_indicators.columns, p=probs)]
-    return samples
+    if size > event_indicators.shape[1]:
+        size = event_indicators.shape[1]
+        
+    samples_sum = pl.DataFrame({"sum":np.zeros(event_indicators.shape[0])})
+    sample_columns = [] 
+    
+    while len(sample_columns) < size:
+        trial_uniqueness = pl.concat([event_indicators,samples_sum], how="horizontal")
+        trial_uniqueness = trial_uniqueness.select([
+            (pl.col(item)/(pl.col(item)+pl.col("sum"))).alias(item) for item in event_indicators.columns
+        ])
+        avg_uniqueness = trial_uniqueness.select(
+            [
+                pl.col(item).filter(pl.col(item)>0.0).mean()  for item in event_indicators.columns
+            ]
+        )
+        ##不放回采样的独立性更高
+        avg_uniqueness = avg_uniqueness.select([
+            pl.when(item in sample_columns).then(0.0).otherwise(pl.col(item)).alias(item) for item in event_indicators.columns
+        ])
+        probs = (avg_uniqueness/avg_uniqueness.sum(axis=1)).row(0)
+        idxs = [np.random.choice(event_indicators.columns, p=probs)]
+        sample_columns += idxs
+        samples_sum = pl.concat([samples_sum,event_indicators.select(idxs)], how="horizontal")
+        samples_sum = samples_sum.sum(axis=1).to_frame(name="sum")
+    return sorted([int(item) for item in sample_columns])
+    
 
 def _get_return_attributions(event_times, events_counts, bars):
     returns = bars.select([pl.col("Close").log().diff().alias("values"),pl.col("datetime").alias("index")])

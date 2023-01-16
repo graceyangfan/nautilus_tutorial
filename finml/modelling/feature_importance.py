@@ -2,10 +2,7 @@ import numpy as np
 import polars as pl 
 from sklearn.metrics import log_loss, accuracy_score
 from .cross_validation import PurgedKFold 
-
-class Metrics:
-    NEG_LOG_LOSS = 'neg_log_loss'
-    ACCURACY = 'accuracy'
+from .metrics import Metrics 
 
 def get_mean_decrease_impurity(model, feature_names):
     """
