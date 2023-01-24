@@ -109,7 +109,7 @@ def sample_sequential_bootstrap(event_indicators, size=None):
         ])
         probs = (avg_uniqueness/avg_uniqueness.sum(axis=1)).row(0)
         idxs = [np.random.choice(event_indicators.columns, p=probs)]
-        sample_columns += idxs
+        sample_columns.extend(idxs)
         samples_sum = pl.concat([samples_sum,event_indicators.select(idxs)], how="horizontal")
         samples_sum = samples_sum.sum(axis=1).to_frame(name="sum")
     return sorted([int(item) for item in sample_columns])

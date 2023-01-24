@@ -20,6 +20,7 @@ def create_label(
     df,
     threshold = 0.01,
     stop_loss = None,
+    cut_label = True,
 ):
     zigzags = []
     for idx,item in enumerate(df.select(["datetime","close"]).iterrows()):
@@ -120,6 +121,20 @@ def create_label(
             pl.col("label")
         ]
     )
+    if cut_label:
+        label_array = df[:,"label"].to_numpy()
+        df = df.select([
+            pl.all().exclude("label"),
+            (pl.when(pl.col("label")>label_array.mean() +5.0*label_array.std())
+             .then(label_array.mean() +5.0*label_array.std())
+             .otherwise(pl.col("label"))).alias("label"),
+        ])
+        df = df.select([
+            pl.all().exclude("label"),
+            (pl.when(pl.col("label")< label_array.mean() - 5.0*label_array.std())
+             .then(label_array.mean() - 5.0*label_array.std())
+             .otherwise(pl.col("label"))).alias("label"),
+        ])
 
     return df 
 

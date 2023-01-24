@@ -61,13 +61,12 @@ impl FracDiff {
     pub fn initialized(&self) -> bool {
         self.initialized
     }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
 }
 
-#[pymodule]
-fn fracdiff(_: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<FracDiff>()?;
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {

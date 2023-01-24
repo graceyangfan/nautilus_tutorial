@@ -5,12 +5,10 @@ use statrs::distribution::{Normal, Univariate};
 use crate::sadf;
 
 
-
 #[pyclass]
 #[derive(Debug)]
 pub struct MicroStructucture {
     period: usize,
-    window: usize,
     high_array:VecDeque<f64>,
     low_array:VecDeque<f64>,
     close_array: VecDeque<f64>,
@@ -30,13 +28,9 @@ pub struct MicroStructucture {
 impl MicroStructucture {
     #[new]
     #[args(b0 = "1.0")]
-    pub fn new(period: usize, window: usize,b0: f64) -> Self {
-        if window > period {
-            panic!("window is larger than period");
-        }
+    pub fn new(period: usize,b0: f64) -> Self {
         let mut data = MicroStructucture {
             period: period,
-            window: window,
             high_array: VecDeque::with_capacity(period),
             low_array: VecDeque::with_capacity(period),
             close_array: VecDeque::with_capacity(period),
@@ -99,9 +93,9 @@ impl MicroStructucture {
         {
             self.close_diff_shift.push_back(self.close_diff[self.close_diff.len()-2]);
         }
-        if self.close_diff.len() > self.window
+        if self.close_diff.len() >= self.period
         {
-            let dp = self.close_diff.range(self.close_diff.len()-self.window..).copied().collect::<Vec<_>>();
+            let dp = &self.close_diff;
             let std = dp.std_dev();
             let norm  = Normal::new(0.0, 1.0).unwrap();
             let buy_volume = self.volume_array[self.volume_array.len() - 1] * norm.cdf(self.close_diff[self.close_diff.len() - 1] / std);
@@ -154,9 +148,9 @@ impl MicroStructucture {
     }
 
     pub fn roll_effective_spread(&self) -> (f64, f64) {
-        let dp = self.close_array.range(self.close_array.len() - self.window..).copied().collect::<Vec<_>>();
-        let dp_dif = self.close_diff.range(self.close_diff.len() - self.window..).copied().collect::<Vec<_>>();
-        let dp_dif_shift = self.close_diff_shift.range(self.close_diff_shift.len() - self.window..).copied().collect::<Vec<_>>();
+        let dp = &self.close_array;
+        let dp_dif = &self.close_diff;
+        let dp_dif_shift = &self.close_diff_shift;
         let dp_var = dp.variance();
         let dp_cov = (dp_dif).covariance(dp_dif_shift);
         let c = (-dp_cov).max(0.0).sqrt()*2.0;
@@ -166,14 +160,14 @@ impl MicroStructucture {
     
 
     pub fn high_low_volatility(&self) -> f64 {
-        let high_prices =self.high_array.range(self.high_array.len() - self.window..).copied().collect::<Vec<_>>();
-        let low_prices = self.low_array.range(self.low_array.len() - self.window..).copied().collect::<Vec<_>>();
+        let high_prices = &self.high_array;
+        let low_prices = &self.low_array;
         
         let hl_log_rets: f64 = high_prices
             .iter()
             .zip(low_prices)
             .map(|(high, low)| (high.ln() - low.ln()).powf(2.0))
-            .sum::<f64>() / (self.window as f64);
+            .sum::<f64>() / (self.period as f64);
         
         (hl_log_rets / (4.0 * 2.0f64.ln())).sqrt()
     }
@@ -189,7 +183,7 @@ impl MicroStructucture {
     }
 
     pub fn get_beta(&self) -> f64{
-        let beta_array = self.betas.range(self.betas.len() - self.window..).copied().collect::<Vec<_>>();
+        let beta_array = &self.betas;
         beta_array.mean()
     }
     pub fn get_gamma(&self) ->f64{
@@ -218,47 +212,36 @@ impl MicroStructucture {
 
     pub fn bar_based_kyle_lambda(&self) -> f64 
     {
-        let signed_volume = self.volume_array
-            .iter()
-            .zip(self.tick_directions.iter())
-            .map(|(x, y)| x*y).collect();
-
-        let array = self.close_diff.iter().zip(signed_volume.iter()).map(|(x, y)| x/y).collect();
+        let signed_volume = self.volume_array.iter().zip(self.tick_directions.iter()).map(|(x, y)| x*y).collect::<Vec<_>>();
+        let array = self.close_diff.iter().zip(signed_volume.iter()).map(|(x, y)| x/y).collect::<Vec<_>>();
         return array.mean();
     }
 
     pub fn bar_based_amihud_lambda(&self) -> f64
     {
-        let array = self.log_net_array.iter().zip(self.dollor_value_array.iter()).map(|(x, y)| x/y).collect();
+        let array = self.log_net_array.iter().zip(self.dollor_value_array.iter()).map(|(x, y)| x/y).collect::<Vec<_>>();
         return array.mean();
     }
 
     pub fn bar_based_hasbrouck_lambda(&self) ->f64 
     {
-        let input_x = self.dollor_value_array
-            .iter()
-            .zip(self.tick_directions.iter())
-            .map(|(x,d)| x.sqrt() * d).collect();
-        let (betas,variances) = sadf::get_betas(&input_x,&self.log_net_array);
-        let array = self.log_net_array.iter().zip(self.input_x.iter()).map(|(x, y)| x/y).collect();
+        let input_x = self.dollor_value_array.iter().zip(self.tick_directions.iter()).map(|(x,d)| x.sqrt() * d).collect::<Vec<_>>();
+        let array = self.log_net_array.iter().zip(input_x.iter()).map(|(x, y)| x/y).collect::<Vec<_>>();
         return array.mean();
     }
   
     pub fn trades_based_kyle_lambda(&self) ->(f64, f64)
     {
-        let signed_volume = self.volume_array
-            .iter()
-            .zip(self.tick_directions.iter())
-            .map(|(x, y)| x*y).collect();
-        let (betas,variances) = sadf::get_betas(&signed_volume,&self.close_diff);
-        let tvalue = betas / variances;
-        (betas,tvalue)
+        let signed_volume = self.volume_array.iter().zip(self.tick_directions.iter()).map(|(x, y)| x*y).collect();
+        let (_betas,_variances) = sadf::get_betas(&signed_volume,&self.close_diff);
+        let _tvalue = _betas / _variances;
+        (_betas,_tvalue)
     }
 
     pub fn trades_based_amihud_lambda(&self) -> (f64, f64) {
-        let (betas,variances) = sadf::get_betas(&self.dollor_value_array,&self.log_net_array);
-        let tvalue = betas / variances;
-        (betas,tvalue)
+        let (_betas,_variances) = sadf::get_betas(&self.dollor_value_array,&self.log_net_array);
+        let _tvalue = _betas / _variances;
+        (_betas,_tvalue)
     }
     
 
@@ -268,23 +251,16 @@ impl MicroStructucture {
             .iter()
             .zip(self.tick_directions.iter())
             .map(|(x,d)| x.sqrt() * d).collect();
-        let (betas,variances) = sadf::get_betas(&input_x,&self.log_net_array);
-        let tvalue = betas / variances;
-        (betas,tvalue)
+        let (_betas,_variances) = sadf::get_betas(&input_x,&self.log_net_array);
+        let _tvalue = _betas / _variances;
+        (_betas,_tvalue)
     }
 
-    pub fn  vpin(&self) -> f64
+    pub fn vpin(&self) -> f64
     {
-        let volume_imbalance_array = self.volume_imbalance_array.range(self.betas.len() - self.window..).copied().collect::<Vec<_>>();
+        let volume_imbalance_array = &self.volume_imbalance_array;
         (volume_imbalance_array).mean() / self.volume_array[self.volume_array.len() - 1]
     }
-}
-
-
-#[pymodule]
-fn my_module(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<MicroStructucture>()?;
-    Ok(())
 }
 
 
@@ -297,7 +273,7 @@ mod tests {
     #[test]
     fn test_microstructucture() {
         // Create a new MicroStructucture object with a period of 10 and a window of 5
-        let mut ms = MicroStructucture::new(10, 5, 1.0);
+        let mut ms = MicroStructucture::new(5, 1.0);
 
         // Update the MicroStructucture object with some dummy data
         ms.update_raw(138.23, 137.41, 138.23, 438.33);
@@ -327,10 +303,10 @@ mod tests {
         assert!(ms.initialized());
     
         // Check the values of various fields in the MicroStructucture object
-        assert_eq!(ms.high_array, vec![139.61, 139.68, 139.84, 139.89, 140.17, 140.47, 140.61, 140.72, 141.05, 141.06]);
-        assert_eq!(ms.low_array, vec![138.09, 138.18, 138.28, 138.38, 138.47, 138.57, 138.67, 138.76, 138.86, 138.96]);
-        assert_eq!(ms.close_array, vec![139.61, 139.68, 139.84, 139.89, 140.17, 140.47, 140.61, 140.72, 141.05, 141.06]);
-        assert_eq!(ms.volume_array, vec![1078.97, 1065.64, 1207.42, 1036.27, 1535.06, 1578.72, 1772.86, 1727.96, 1791.76, 1434.92]);
+        assert_eq!(ms.high_array, vec![140.47, 140.61, 140.72, 141.05, 141.06]);
+        assert_eq!(ms.low_array, vec![138.57, 138.67, 138.76, 138.86, 138.96]);
+        assert_eq!(ms.close_array, vec![140.47, 140.61, 140.72, 141.05, 141.06]);
+        assert_eq!(ms.volume_array, vec![1578.72, 1772.86, 1727.96, 1791.76, 1434.92]);
         // Calculate the effective spread and check the result
         let (c, dm_var) = ms.roll_effective_spread();
         assert_abs_diff_eq!(c, 0.15962455951389545, epsilon=1e-6);
@@ -344,19 +320,19 @@ mod tests {
         assert_abs_diff_eq!(volatility, 0.002311,epsilon=1e-6);
         // Calculate the trades-based Kyle lambda and t-value and check the result
         let (betas,tvalue) = ms.trades_based_kyle_lambda();
-        assert_abs_diff_eq!(betas,0.00011164, epsilon=1e-6);
-        assert_abs_diff_eq!(tvalue,246908.1469022178,epsilon=1e-6);
+        assert_abs_diff_eq!(betas,0.0001092478534217924, epsilon=1e-6);
+        assert_abs_diff_eq!(tvalue,93509.72002350067,epsilon=1e-6);
         // Calculate the Amihud lambda and t-value and check the result
         let (lambda, tvalue) = ms.trades_based_amihud_lambda();
-        assert_abs_diff_eq!(lambda,5.662249656853047e-09, epsilon=1e-12);
-        assert_abs_diff_eq!(tvalue,4876404732.394968,epsilon=1e-6);
+        assert_abs_diff_eq!(lambda,5.517580116293106e-9, epsilon=1e-12);
+        assert_abs_diff_eq!(tvalue,1849193958.488904,epsilon=1e-6);
         // Calculate the trades-based Hasbrouck lambda and t-value and check the result
         let (lambda, tvalue) = ms.trades_based_hasbrouck_lambda();
-        assert_abs_diff_eq!(lambda,2.527342495394056e-06, epsilon=1e-9);
-        assert_abs_diff_eq!(tvalue, 9232516.145169716,epsilon=1e-6);
+        assert_abs_diff_eq!(lambda,2.650398114976172e-6, epsilon=1e-9);
+        assert_abs_diff_eq!(tvalue,3591027.05015759,epsilon=1e-6);
         // Calculate the VPIN and check the result
         let vpin = ms.vpin();
-        assert_abs_diff_eq!(vpin, 0.847799,epsilon=1e-6);
+        assert_abs_diff_eq!(vpin, 0.8605053721383698,epsilon=1e-6);
     }
 }
 

@@ -150,11 +150,6 @@ impl Entropy {
     }
 }
 
-#[pymodule]
-fn entropy(_: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::< Entropy>()?;
-    Ok(())
-}
 
 
 #[cfg(test)]
