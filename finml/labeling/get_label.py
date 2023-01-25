@@ -109,8 +109,8 @@ def create_label(
         df = df[:len(correct_label),:]
         df.replace("label",pl.Series(correct_label))
 
-    ## drop the front and the last trend data because zigzag is meanless on these data 
-    df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"])&(pl.col("datetime")<=(zigzags[-2,"datetime"])))
+    ## drop the front data because zigzag is meanless on these data 
+    df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"]))
 
     df = df.select(
         [

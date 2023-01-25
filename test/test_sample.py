@@ -56,6 +56,9 @@ if __name__ == "__main__":
     bars = labeled_df.select([pl.col("datetime"),pl.col("close")])
 
     events_indicators = get_event_indicators(bars,events)
-    sample_sequential_bootstrap(events_indicators, size=100)
+    sample_indexs = sample_sequential_bootstrap(events_indicators, size=100)
+    import pickle
+    with open('sample_indexs.pkl', 'wb') as f:
+        pickle.dump(sample_indexs, f)
 
 

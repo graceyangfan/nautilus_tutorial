@@ -67,7 +67,7 @@ def label_avg_uniqueness(bars, events):
     return res
 
 
-def get_event_indicators(bar_times, event_times, njobs = 4):
+def get_event_indicators(bar_times, event_times, njobs = 1):
     res = bar_times.select(pl.col("datetime").alias("index"))
     params = [{"res":res,
                "event_starts":event_times[i,"event_starts"],
