@@ -62,8 +62,22 @@ cdef class ExtendedBarBuilder:
     cdef object _cum_value
 
     cpdef void set_partial(self, ExtendedBar partial_bar) except *
-    cpdef void update(self, Price price, Quantity size, uint64_t ts_event) except *
+    cpdef void update(
+        self, 
+        Price price, 
+        Quantity size, 
+        AggressorSide aggressor_side,
+        double dollar_value, 
+        uint64_t ts_event
+    ) except *
     cpdef void reset(self) except *
     cpdef ExtendedBar build(self, uint64_t ts_event)
     cpdef void handle_trade_tick(self, TradeTick tick) except *
-    cdef void _apply_update(self, Price price, Quantity size, AggressorSide aggressor_side, uint64_t ts_event) except *
+    cdef void _apply_update(
+        self, 
+        Price price, 
+        Quantity size, 
+        AggressorSide aggressor_side, 
+        double dollar_value, 
+        uint64_t ts_event
+    ) except *

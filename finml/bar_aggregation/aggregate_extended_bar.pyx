@@ -32,14 +32,12 @@ from nautilus_trader.model.objects cimport Quantity
 cdef class ExtendedBarBuilder:
     """
     Provides a generic extendedbar builder for aggregation.
-
     Parameters
     ----------
     instrument : Instrument
         The instrument for the builder.
     bar_type : BarType
         The bar type for the builder.
-
     Raises
     ------
     ValueError
@@ -89,14 +87,11 @@ cdef class ExtendedBarBuilder:
     cpdef void set_partial(self, ExtendedBar partial_bar) except *:
         """
         Set the initial values for a partially completed bar.
-
         This method can only be called once per instance.
-
         Parameters
         ----------
         partial_bar : ExtendedBar
             The partial bar with values to set.
-
         """
         if self._partial_set:
             return  # Already updated
@@ -130,19 +125,28 @@ cdef class ExtendedBarBuilder:
         self._partial_set = True
         self.initialized = True
 
-    cpdef void update(self, Price price, Quantity size, uint64_t ts_event) except *:
+    cpdef void update(
+        self, 
+        Price price, 
+        Quantity size, 
+        AggressorSide aggressor_side,
+        double dollar_value, 
+        uint64_t ts_event
+    ) except *:
         """
         Update the bar builder.
-
         Parameters
         ----------
         price : Price
             The update price.
         size : Decimal
             The update size.
+        aggressor_side: AggressorSide
+            The aggressorside of the size.
+        dollar_value: double 
+            The dollar_value level of the size.
         ts_event : uint64_t
             The UNIX timestamp (nanoseconds) of the update.
-
         """
         Condition.not_none(price, "price")
         Condition.not_none(size, "size")
@@ -164,18 +168,43 @@ cdef class ExtendedBarBuilder:
 
         self._close = price
         self.volume._mem.raw += size._mem.raw
+
+        # save size into different level 
+        cdef double dollar_value_with_size
+        dollar_value_with_size = price.as_double() * size.as_double() 
+        if aggressor_side ==  AggressorSide.BUYER:
+            if dollar_value < self.level_array[0]:
+                self.bids_value_level_0 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[0] and dollar_value < self.level_array[1]):
+                self.bids_value_level_1 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[1] and dollar_value < self.level_array[2]):
+                self.bids_value_level_2 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[2] and dollar_value < self.level_array[3]):
+                self.bids_value_level_3 += dollar_value_with_size
+            elif dollar_value >= self.level_array[3]:
+                self.bids_value_level_4 += dollar_value_with_size
+        else:
+            if dollar_value < self.level_array[0]:
+                self.asks_value_level_0 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[0] and dollar_value < self.level_array[1]):
+                self.asks_value_level_1 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[1] and dollar_value < self.level_array[2]):
+                self.asks_value_level_2 += dollar_value_with_size
+            elif (dollar_value >= self.level_array[2] and dollar_value < self.level_array[3]):
+                self.asks_value_level_3 += dollar_value_with_size
+            elif dollar_value >= self.level_array[3]:
+                self.asks_value_level_4 += dollar_value_with_size
+
         self.count += 1
         self.ts_last = ts_event
 
     cpdef void handle_trade_tick(self, TradeTick tick) except *:
         """
         Update the aggregator with the given tick.
-
         Parameters
         ----------
         tick : TradeTick
             The tick for the update.
-
         """
         Condition.not_none(tick, "tick")
 
@@ -183,36 +212,18 @@ cdef class ExtendedBarBuilder:
             price=tick.price,
             size=tick.size,
             aggressor_side=tick.aggressor_side,
+            dollar_value=tick.price.as_double() * tick.size.as_double(),
             ts_event=tick.ts_event,
         )
     
-    cdef void _apply_update(self, Price price, Quantity size, AggressorSide aggressor_side, uint64_t ts_event) except *:
-
-        cdef double dollar_value
-        dollar_value = price.as_double() * size.as_double() 
-        if aggressor_side ==  AggressorSide.BUYER:
-            if dollar_value < self.level_array[0]:
-                self.bids_value_level_0 += dollar_value
-            elif (dollar_value >= self.level_array[0] and dollar_value < self.level_array[1]):
-                self.bids_value_level_1 += dollar_value
-            elif (dollar_value >= self.level_array[1] and dollar_value < self.level_array[2]):
-                self.bids_value_level_2 += dollar_value
-            elif (dollar_value >= self.level_array[2] and dollar_value < self.level_array[3]):
-                self.bids_value_level_3 += dollar_value
-            elif dollar_value >= self.level_array[3]:
-                self.bids_value_level_4 += dollar_value
-        else:
-            if dollar_value < self.level_array[0]:
-                self.asks_value_level_0 += dollar_value
-            elif (dollar_value >= self.level_array[0] and dollar_value < self.level_array[1]):
-                self.asks_value_level_1 += dollar_value
-            elif (dollar_value >= self.level_array[1] and dollar_value < self.level_array[2]):
-                self.asks_value_level_2 += dollar_value
-            elif (dollar_value >= self.level_array[2] and dollar_value < self.level_array[3]):
-                self.asks_value_level_3 += dollar_value
-            elif dollar_value >= self.level_array[3]:
-                self.asks_value_level_4 += dollar_value
-
+    cdef void _apply_update(
+        self, 
+        Price price, 
+        Quantity size, 
+        AggressorSide aggressor_side, 
+        double dollar_value, 
+        uint64_t ts_event
+    ) except *:
 
         size_update = size
 
@@ -223,6 +234,8 @@ cdef class ExtendedBarBuilder:
                  self.update(
                     price=price,
                     size=Quantity(size_update, precision=size._mem.precision),
+                    aggressor_side = aggressorside,
+                    dollar_value = dollar_value,
                     ts_event=ts_event,
                  )
                  break 
@@ -232,6 +245,8 @@ cdef class ExtendedBarBuilder:
             self.update(
                 price=price,
                 size=Quantity(size_diff, precision=size._mem.precision),
+                aggressor_side = aggressorside,
+                dollar_value = dollar_value,
                 ts_event=ts_event,
             )
             new_bar = self.build(self.ts_last)
@@ -246,7 +261,6 @@ cdef class ExtendedBarBuilder:
     cpdef void reset(self) except *:
         """
         Reset the bar builder.
-
         All stateful fields are reset to their initial value.
         """
         self._open = None
@@ -269,16 +283,13 @@ cdef class ExtendedBarBuilder:
     cpdef ExtendedBar build(self, uint64_t ts_event):
         """
         Return the aggregated bar with the given closing timestamp, and reset.
-
         Parameters
         ----------
         ts_event : uint64_t
             The UNIX timestamp (nanoseconds) of the bar close.
-
         Returns
         -------
         Bar
-
         """
         if self._open is None:  # No tick was received
             self._open = self._last_close
