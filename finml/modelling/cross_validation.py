@@ -65,17 +65,14 @@ class PurgedKFold:
 
         for i, j in test_splits:
             test_indices = indices[i:j]
-            test_start_time = event_times[i.item(),"event_starts"]
-            train_1_indices = indices[(event_times.select("event_ends") < test_start_time).to_numpy().flatten()]
-            train_indices = train_1_indices
-
-            test_end_time = event_times[test_indices,"event_ends"].max()[0,"event_ends"]
-            train_2_start_idx = event_times.select("event_starts").to_numpy().flatten().searchsorted(test_end_time, side='right') + 1
-            if train_2_start_idx < num_obs:
-                train_indices = np.concatenate((train_1_indices, indices[train_2_start_idx + embargo:]))
-
+            test_times = pl.DataFrame(
+                {
+                    "event_starts": event_times[i.item(),"event_starts"],
+                    "event_ends": event_times[min(j.item() - 1 + embargo,num_obs), "event_ends"]
+                }
+            )
+            train_indices = _get_purged_train_indices(event_times, test_times)
             yield train_indices, test_indices
-            
 
 
 

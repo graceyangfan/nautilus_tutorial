@@ -103,15 +103,14 @@ def sample_sequential_bootstrap(event_indicators, size=None):
                 pl.col(item).filter(pl.col(item)>0.0).mean()  for item in event_indicators.columns
             ]
         )
-        ##不放回采样的独立性更高
-        avg_uniqueness = avg_uniqueness.select([
-            pl.when(item in sample_columns).then(0.0).otherwise(pl.col(item)).alias(item) for item in event_indicators.columns
-        ])
-        probs = (avg_uniqueness/avg_uniqueness.sum(axis=1)).row(0)
+        probs_sum = avg_uniqueness.sum(axis=1)
+        probs = avg_uniqueness.select([pl.col(item)/probs_sum for item in avg_uniqueness.columns]).to_numpy()[0]
         idxs = [np.random.choice(event_indicators.columns, p=probs)]
         sample_columns.extend(idxs)
         samples_sum = pl.concat([samples_sum,event_indicators.select(idxs)], how="horizontal")
         samples_sum = samples_sum.sum(axis=1).to_frame(name="sum")
+        ##不放回采样的独立性更高
+        event_indicators = event_indicators.drop(idxs[0])
     return sorted([int(item) for item in sample_columns])
     
 
