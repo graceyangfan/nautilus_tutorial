@@ -61,8 +61,12 @@ class GenericData(Strategy):
         self.mfi = MoneyFlowIndex(193)
 
         self.columns = [
-            #"close",
-            #"vlome",
+            "datetime",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
             "zscore",
             "cfo",
             "bias",
@@ -145,13 +149,19 @@ class GenericData(Strategy):
             return 
         
         # update df 
-        indicator_info = np.zeros((1,6)) 
-        indicator_info[0,0] = self.zscore.value 
-        indicator_info[0,1] = self.linear_regression.cfo 
-        indicator_info[0,2] = self.bias.value  
-        indicator_info[0,3] = self.rvi.value  
-        indicator_info[0,4] = self.kvo.value
-        indicator_info[0,5] = self.mfi.value 
+        indicator_info = np.zeros((1,12)) 
+        indicator_info[0,0] = data.ts_event 
+        indicator_info[0,1] = data.open 
+        indicator_info[0,2] = data.high 
+        indicator_info[0,3] = data.low 
+        indicator_info[0,4] = data.close 
+        indicator_info[0,5] = data.volume 
+        indicator_info[0,6] = self.zscore.value 
+        indicator_info[0,7] = self.linear_regression.cfo 
+        indicator_info[0,8] = self.bias.value  
+        indicator_info[0,9] = self.rvi.value  
+        indicator_info[0,10] = self.kvo.value
+        indicator_info[0,11] = self.mfi.value 
 
         x= pd.DataFrame(indicator_info,columns=self.columns)
         self.series_list.append(x)

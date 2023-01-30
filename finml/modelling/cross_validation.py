@@ -6,7 +6,7 @@ def _get_purged_train_indices(event_times, test_times):
         [pl.all(), pl.arange(0, pl.count()).alias("count_index")]
     )
     train_times = event_times.clone()
-    for test_start,test_end in test_times.iterrows():
+    for test_start,test_end in test_times.iter_rows():
         overlap1 = event_times.filter((test_start<=pl.col("event_starts")) & (pl.col("event_starts") <= test_end))
         overlap2 = event_times.filter((test_start<=pl.col("event_ends")) & (pl.col("event_ends") <= test_end))
         overlap3 = event_times.filter((test_start>=pl.col("event_starts")) & (pl.col("event_ends") >= test_end))
@@ -18,8 +18,9 @@ def _get_purged_train_indices(event_times, test_times):
 def _get_embargo_times(bar_times, embargo_pct):
     if isinstance(bar_times,np.ndarray):
         bar_times = list(bar_times)
-    elif isinstance(bar_times,pl.Series):
-        bar_times = bar_times.to_list()
+    elif isinstance(bar_times,pl.DataFrame):
+        bar_times = bar_times.to_numpy().flatten()
+
     
     step = 0 if bar_times is None else int(len(bar_times) * embargo_pct)
     if step == 0:
@@ -38,7 +39,7 @@ def apply_purging_and_embargo(event_times, test_times, bar_times=None, embargo_p
     if bar_times is not None:
         embargo_times = _get_embargo_times(bar_times, embargo_pct)
         adj_test_times = embargo_times.join(test_times,left_on = "event_starts",right_on="event_ends",how="inner").select(
-            [pl.col("start_right").alias("event_starts"),pl.col("event_ends")]
+            [pl.col("event_starts_right").alias("event_starts"),pl.col("event_ends")]
         )
     else:
         adj_test_times = test_times
@@ -68,7 +69,7 @@ class PurgedKFold:
             test_times = pl.DataFrame(
                 {
                     "event_starts": event_times[i.item(),"event_starts"],
-                    "event_ends": event_times[min(j.item() - 1 + embargo,num_obs), "event_ends"]
+                    "event_ends": event_times[min(j.item() - 1 + embargo,num_obs-1), "event_ends"]
                 }
             )
             train_indices = _get_purged_train_indices(event_times, test_times)

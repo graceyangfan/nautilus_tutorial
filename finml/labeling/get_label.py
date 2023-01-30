@@ -23,7 +23,7 @@ def create_label(
     cut_label = True,
 ):
     zigzags = []
-    for idx,item in enumerate(df.select(["datetime","close"]).iterrows()):
+    for idx,item in enumerate(df.select(["datetime","close"]).iter_rows()):
         is_starting = (idx == 0)
         if is_starting:
             zigzags.append(get_zigzag(idx,item))
@@ -112,15 +112,8 @@ def create_label(
     ## drop the front data because zigzag is meanless on these data 
     df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"]))
 
-    df = df.select(
-        [
-            pl.col("datetime"),
-            pl.col("close"),
-            pl.col("datetime").alias("event_starts"),
-            pl.col("event_ends"),
-            pl.col("label")
-        ]
-    )
+    df = df.select(pl.all().exclude(['value', 'type', 'idx', 'prevext']))
+    df = df.with_column( pl.col("datetime").alias("event_starts"))
     if cut_label:
         label_array = df[:,"label"].to_numpy()
         df = df.select([

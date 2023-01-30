@@ -36,7 +36,7 @@ def count_events_per_bar(bar_times, event_times):
             "values": np.zeros(event_times_iloc2-event_times_iloc1 + 1)
         }
     )
-    for event_starts,event_ends in event_times.iterrows():
+    for event_starts,event_ends in event_times.iter_rows():
         res = res.with_column(
             pl.when((pl.col("index") >= event_starts) & (pl.col("index") <= event_ends))
             .then(pl.col("values")+1)
@@ -57,7 +57,7 @@ def label_avg_uniqueness(bars, events):
             "values": np.zeros(events.shape[0])
         }
     )
-    for event_starts,event_ends in events.iterrows():
+    for event_starts,event_ends in events.iter_rows():
         res = res.with_column(
             pl.when((pl.col("index") == event_starts))
             .then((1.0 / events_counts.filter((pl.col("index")>= event_starts)&(pl.col("index")<=event_ends))["values"]).mean())
@@ -122,7 +122,7 @@ def _get_return_attributions(event_times, events_counts, bars):
             "values": np.zeros(event_times.shape[0])
         }
     )
-    for event_starts,event_ends in event_times.iterrows():
+    for event_starts,event_ends in event_times.iter_rows():
         return_attributed = returns.filter(
             (pl.col("index")>=event_starts) & (pl.col("index")<=event_ends) 
         )["values"] / events_counts.filter(
