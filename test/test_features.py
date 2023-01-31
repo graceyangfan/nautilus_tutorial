@@ -5,7 +5,31 @@ import polars as pl
 import pandas as pd 
 from finml.utils.stats import corrections 
 
-def ms_feature_evaluate(df, labeled_df):
+
+def original_feature(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    factor = df.select([
+            pl.col("close"),
+            pl.col("volume"),
+            pl.col('bids_value_level_0'),
+            pl.col('bids_value_level_1'),
+            pl.col('bids_value_level_2'),
+            pl.col('bids_value_level_3'),
+            pl.col('bids_value_level_4'),
+            pl.col('asks_value_level_0'),
+            pl.col('asks_value_level_1'),
+            pl.col('asks_value_level_2'),
+            pl.col('asks_value_level_3'),
+            pl.col('asks_value_level_4'),
+    ])
+    corr = corrections(
+        factor,
+        label,
+        corr_type ="pearson",
+    )
+    print(f"the  factor corrections are {corr.label}")
+
+def ms_feature_evaluate(df):
     for i in range(50,500,50):
         ms = MicroStructucture(i,1)
         roll_effective_spread_0 = [] 
@@ -70,7 +94,7 @@ def ms_feature_evaluate(df, labeled_df):
             "bar_based_hasbrouck_lambda" : bar_based_hasbrouck_lambda,
             "vpin" : vpin
         })
-        label = labeled_df.select([pl.col('datetime'),pl.col("label")])
+        label = df.select([pl.col('datetime'),pl.col("label")])
         corr = corrections(
             factor,
             label,
@@ -112,8 +136,8 @@ def test_entropy(df, labeled_df):
         print(f"the period {period} factor corrections are {corr.label}")
 
 
-def test_diff(df, labeled_df):
-    label = labeled_df.select([pl.col('datetime'),pl.col("label")])
+def test_diff(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
     for order in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]:
         for period in range(50,500,50):
             frac_dif = FracDiff(order,period)
@@ -138,8 +162,8 @@ def test_diff(df, labeled_df):
             print(f"the period {period} and order {order} factor corrections are {corr.label}")
 
 
-def test_value_diff(df, labeled_df):
-    label = labeled_df.select([pl.col('datetime'),pl.col("label")])
+def test_value_diff(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
     for period in range(50,500,50):
         factor  = df.select([
             pl.col("datetime"),
@@ -206,3 +230,225 @@ def test_value_diff(df, labeled_df):
                     corr_type ="pearson",
                 )
         print(f"the period {period} factor corrections are {corr.label}")
+
+from nautilus_trader.indicators.zscore import Zscore
+def test_zscore(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        bids_value_level_0_zscore = Zscore(period)
+        bids_value_level_1_zscore = Zscore(period)
+        bids_value_level_2_zscore = Zscore(period)
+        bids_value_level_3_zscore = Zscore(period)
+        bids_value_level_4_zscore = Zscore(period)
+        asks_value_level_0_zscore = Zscore(period)
+        asks_value_level_1_zscore = Zscore(period)
+        asks_value_level_2_zscore = Zscore(period)
+        asks_value_level_3_zscore = Zscore(period)
+        asks_value_level_4_zscore = Zscore(period)
+        value_level_0_diff_zscore = Zscore(period)
+        value_level_1_diff_zscore = Zscore(period)
+        value_level_2_diff_zscore = Zscore(period)
+        value_level_3_diff_zscore = Zscore(period)
+        value_level_4_diff_zscore = Zscore(period)
+        datetime = [] 
+        bids_value_level_0_zscore_list = [] 
+        bids_value_level_1_zscore_list = []
+        bids_value_level_2_zscore_list = []
+        bids_value_level_3_zscore_list = []
+        bids_value_level_4_zscore_list = []
+        asks_value_level_0_zscore_list = []
+        asks_value_level_1_zscore_list = []
+        asks_value_level_2_zscore_list = []
+        asks_value_level_3_zscore_list = []
+        asks_value_level_4_zscore_list = []
+        value_level_0_diff_zscore_list = []
+        value_level_1_diff_zscore_list = []
+        value_level_2_diff_zscore_list = []
+        value_level_3_diff_zscore_list = []
+        value_level_4_diff_zscore_list = []
+        for j in range(df.shape[0]):
+            bids_value_level_0_zscore.update_raw(df[j,"bids_value_level_0"])
+            bids_value_level_1_zscore.update_raw(df[j,"bids_value_level_1"])
+            bids_value_level_2_zscore.update_raw(df[j,"bids_value_level_2"])
+            bids_value_level_3_zscore.update_raw(df[j,"bids_value_level_3"])
+            bids_value_level_4_zscore.update_raw(df[j,"bids_value_level_4"])
+            asks_value_level_0_zscore.update_raw(df[j,"asks_value_level_0"])
+            asks_value_level_1_zscore.update_raw(df[j,"asks_value_level_1"])
+            asks_value_level_2_zscore.update_raw(df[j,"asks_value_level_2"])
+            asks_value_level_3_zscore.update_raw(df[j,"asks_value_level_3"])
+            asks_value_level_4_zscore.update_raw(df[j,"asks_value_level_4"])
+            value_level_0_diff_zscore.update_raw(df[j,"bids_value_level_0"]-df[j,"asks_value_level_0"])
+            value_level_1_diff_zscore.update_raw(df[j,"bids_value_level_1"]-df[j,"asks_value_level_1"])
+            value_level_2_diff_zscore.update_raw(df[j,"bids_value_level_2"]-df[j,"asks_value_level_2"])
+            value_level_3_diff_zscore.update_raw(df[j,"bids_value_level_3"]-df[j,"asks_value_level_3"])
+            value_level_4_diff_zscore.update_raw(df[j,"bids_value_level_4"]-df[j,"asks_value_level_4"])
+            datetime.append(df[j,"datetime"])
+            if not bids_value_level_0_zscore.initialized():
+                bids_value_level_0_zscore_list.append(np.nan)
+                bids_value_level_1_zscore_list.append(np.nan)
+                bids_value_level_2_zscore_list.append(np.nan)
+                bids_value_level_3_zscore_list.append(np.nan)
+                bids_value_level_4_zscore_list.append(np.nan)
+                asks_value_level_0_zscore_list.append(np.nan)
+                asks_value_level_1_zscore_list.append(np.nan)
+                asks_value_level_2_zscore_list.append(np.nan)
+                asks_value_level_3_zscore_list.append(np.nan)
+                asks_value_level_4_zscore_list.append(np.nan)
+                value_level_0_diff_zscore_list.append(np.nan)
+                value_level_1_diff_zscore_list.append(np.nan)
+                value_level_2_diff_zscore_list.append(np.nan)
+                value_level_3_diff_zscore_list.append(np.nan)
+                value_level_4_diff_zscore_list.append(np.nan)
+            else:
+                bids_value_level_0_zscore_list.append(bids_value_level_0_zscore.value)
+                bids_value_level_1_zscore_list.append(bids_value_level_1_zscore.value)
+                bids_value_level_2_zscore_list.append(bids_value_level_2_zscore.value)
+                bids_value_level_3_zscore_list.append(bids_value_level_3_zscore.value)
+                bids_value_level_4_zscore_list.append(bids_value_level_4_zscore.value)
+                asks_value_level_0_zscore_list.append(asks_value_level_0_zscore.value)
+                asks_value_level_1_zscore_list.append(asks_value_level_1_zscore.value)
+                asks_value_level_2_zscore_list.append(asks_value_level_2_zscore.value)
+                asks_value_level_3_zscore_list.append(asks_value_level_3_zscore.value)
+                asks_value_level_4_zscore_list.append(asks_value_level_4_zscore.value)
+                value_level_0_diff_zscore_list.append(value_level_0_diff_zscore.value)
+                value_level_1_diff_zscore_list.append(value_level_1_diff_zscore.value)
+                value_level_2_diff_zscore_list.append(value_level_2_diff_zscore.value)
+                value_level_3_diff_zscore_list.append(value_level_3_diff_zscore.value)
+                value_level_4_diff_zscore_list.append(value_level_4_diff_zscore.value)
+            factor = pd.DataFrame({
+                "datetime":datetime,
+                "bids_value_level_0_zscore" : bids_value_level_0_zscore_list,
+                "bids_value_level_1_zscore" : bids_value_level_1_zscore_list,
+                "bids_value_level_2_zscore" : bids_value_level_2_zscore_list,
+                "bids_value_level_3_zscore" : bids_value_level_3_zscore_list,
+                "bids_value_level_4_zscore" : bids_value_level_4_zscore_list,
+                "asks_value_level_0_zscore" : asks_value_level_0_zscore_list,
+                "asks_value_level_1_zscore" : asks_value_level_1_zscore_list,
+                "asks_value_level_2_zscore" : asks_value_level_2_zscore_list,
+                "asks_value_level_3_zscore" : asks_value_level_3_zscore_list,
+                "asks_value_level_4_zscore" : asks_value_level_4_zscore_list,
+                "value_level_0_diff_zscore" : value_level_0_diff_zscore_list,
+                "value_level_1_diff_zscore" : value_level_1_diff_zscore_list,
+                "value_level_2_diff_zscore" : value_level_2_diff_zscore_list,
+                "value_level_3_diff_zscore" : value_level_3_diff_zscore_list,
+                "value_level_4_diff_zscore" : value_level_4_diff_zscore_list,
+            })
+            label = df.select([pl.col('datetime'),pl.col("label")])
+            corr = corrections(
+                factor,
+                label,
+                corr_type ="pearson",
+            )
+            print(f"the period {period} factor corrections are {corr.label}")
+
+
+
+from nautilus_trader.indicators.average.vidya import VariableIndexDynamicAverage
+def test_vidya(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        bids_value_level_0_vidya = VariableIndexDynamicAverage(period)
+        bids_value_level_1_vidya = VariableIndexDynamicAverage(period)
+        bids_value_level_2_vidya = VariableIndexDynamicAverage(period)
+        bids_value_level_3_vidya = VariableIndexDynamicAverage(period)
+        bids_value_level_4_vidya = VariableIndexDynamicAverage(period)
+        asks_value_level_0_vidya = VariableIndexDynamicAverage(period)
+        asks_value_level_1_vidya = VariableIndexDynamicAverage(period)
+        asks_value_level_2_vidya = VariableIndexDynamicAverage(period)
+        asks_value_level_3_vidya = VariableIndexDynamicAverage(period)
+        asks_value_level_4_vidya = VariableIndexDynamicAverage(period)
+        value_level_0_diff_vidya = VariableIndexDynamicAverage(period)
+        value_level_1_diff_vidya = VariableIndexDynamicAverage(period)
+        value_level_2_diff_vidya = VariableIndexDynamicAverage(period)
+        value_level_3_diff_vidya = VariableIndexDynamicAverage(period)
+        value_level_4_diff_vidya = VariableIndexDynamicAverage(period)
+        datetime = [] 
+        bids_value_level_0_vidya_list = [] 
+        bids_value_level_1_vidya_list = []
+        bids_value_level_2_vidya_list = []
+        bids_value_level_3_vidya_list = []
+        bids_value_level_4_vidya_list = []
+        asks_value_level_0_vidya_list = []
+        asks_value_level_1_vidya_list = []
+        asks_value_level_2_vidya_list = []
+        asks_value_level_3_vidya_list = []
+        asks_value_level_4_vidya_list = []
+        value_level_0_diff_vidya_list = []
+        value_level_1_diff_vidya_list = []
+        value_level_2_diff_vidya_list = []
+        value_level_3_diff_vidya_list = []
+        value_level_4_diff_vidya_list = []
+        for j in range(df.shape[0]):
+            bids_value_level_0_vidya.update_raw(df[j,"bids_value_level_0"])
+            bids_value_level_1_vidya.update_raw(df[j,"bids_value_level_1"])
+            bids_value_level_2_vidya.update_raw(df[j,"bids_value_level_2"])
+            bids_value_level_3_vidya.update_raw(df[j,"bids_value_level_3"])
+            bids_value_level_4_vidya.update_raw(df[j,"bids_value_level_4"])
+            asks_value_level_0_vidya.update_raw(df[j,"asks_value_level_0"])
+            asks_value_level_1_vidya.update_raw(df[j,"asks_value_level_1"])
+            asks_value_level_2_vidya.update_raw(df[j,"asks_value_level_2"])
+            asks_value_level_3_vidya.update_raw(df[j,"asks_value_level_3"])
+            asks_value_level_4_vidya.update_raw(df[j,"asks_value_level_4"])
+            value_level_0_diff_vidya.update_raw(df[j,"bids_value_level_0"]-df[j,"asks_value_level_0"])
+            value_level_1_diff_vidya.update_raw(df[j,"bids_value_level_1"]-df[j,"asks_value_level_1"])
+            value_level_2_diff_vidya.update_raw(df[j,"bids_value_level_2"]-df[j,"asks_value_level_2"])
+            value_level_3_diff_vidya.update_raw(df[j,"bids_value_level_3"]-df[j,"asks_value_level_3"])
+            value_level_4_diff_vidya.update_raw(df[j,"bids_value_level_4"]-df[j,"asks_value_level_4"])
+            datetime.append(df[j,"datetime"])
+            if not bids_value_level_0_vidya.initialized():
+                bids_value_level_0_vidya_list.append(np.nan)
+                bids_value_level_1_vidya_list.append(np.nan)
+                bids_value_level_2_vidya_list.append(np.nan)
+                bids_value_level_3_vidya_list.append(np.nan)
+                bids_value_level_4_vidya_list.append(np.nan)
+                asks_value_level_0_vidya_list.append(np.nan)
+                asks_value_level_1_vidya_list.append(np.nan)
+                asks_value_level_2_vidya_list.append(np.nan)
+                asks_value_level_3_vidya_list.append(np.nan)
+                asks_value_level_4_vidya_list.append(np.nan)
+                value_level_0_diff_vidya_list.append(np.nan)
+                value_level_1_diff_vidya_list.append(np.nan)
+                value_level_2_diff_vidya_list.append(np.nan)
+                value_level_3_diff_vidya_list.append(np.nan)
+                value_level_4_diff_vidya_list.append(np.nan)
+            else:
+                bids_value_level_0_vidya_list.append(bids_value_level_0_vidya.value)
+                bids_value_level_1_vidya_list.append(bids_value_level_1_vidya.value)
+                bids_value_level_2_vidya_list.append(bids_value_level_2_vidya.value)
+                bids_value_level_3_vidya_list.append(bids_value_level_3_vidya.value)
+                bids_value_level_4_vidya_list.append(bids_value_level_4_vidya.value)
+                asks_value_level_0_vidya_list.append(asks_value_level_0_vidya.value)
+                asks_value_level_1_vidya_list.append(asks_value_level_1_vidya.value)
+                asks_value_level_2_vidya_list.append(asks_value_level_2_vidya.value)
+                asks_value_level_3_vidya_list.append(asks_value_level_3_vidya.value)
+                asks_value_level_4_vidya_list.append(asks_value_level_4_vidya.value)
+                value_level_0_diff_vidya_list.append(value_level_0_diff_vidya.value)
+                value_level_1_diff_vidya_list.append(value_level_1_diff_vidya.value)
+                value_level_2_diff_vidya_list.append(value_level_2_diff_vidya.value)
+                value_level_3_diff_vidya_list.append(value_level_3_diff_vidya.value)
+                value_level_4_diff_vidya_list.append(value_level_4_diff_vidya.value)
+            factor = pd.DataFrame({
+                "datetime":datetime,
+                "bids_value_level_0_vidya" : bids_value_level_0_vidya_list,
+                "bids_value_level_1_vidya" : bids_value_level_1_vidya_list,
+                "bids_value_level_2_vidya" : bids_value_level_2_vidya_list,
+                "bids_value_level_3_vidya" : bids_value_level_3_vidya_list,
+                "bids_value_level_4_vidya" : bids_value_level_4_vidya_list,
+                "asks_value_level_0_vidya" : asks_value_level_0_vidya_list,
+                "asks_value_level_1_vidya" : asks_value_level_1_vidya_list,
+                "asks_value_level_2_vidya" : asks_value_level_2_vidya_list,
+                "asks_value_level_3_vidya" : asks_value_level_3_vidya_list,
+                "asks_value_level_4_vidya" : asks_value_level_4_vidya_list,
+                "value_level_0_diff_vidya" : value_level_0_diff_vidya_list,
+                "value_level_1_diff_vidya" : value_level_1_diff_vidya_list,
+                "value_level_2_diff_vidya" : value_level_2_diff_vidya_list,
+                "value_level_3_diff_vidya" : value_level_3_diff_vidya_list,
+                "value_level_4_diff_vidya" : value_level_4_diff_vidya_list,
+            })
+            label = df.select([pl.col('datetime'),pl.col("label")])
+            corr = corrections(
+                factor,
+                label,
+                corr_type ="pearson",
+            )
+            print(f"the period {period} factor corrections are {corr.label}")
