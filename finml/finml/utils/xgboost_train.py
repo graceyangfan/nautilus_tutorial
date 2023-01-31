@@ -67,8 +67,6 @@ def hyper_opt_classifier(
     if object_func is None:
         object_func = "multi:softmax" if num_class >2 else "binary:logistic"
     def objective(trial):
-
-        evals_result = {}
         hyper_params = {
             "booster": "gbtree",
             "num_class": num_class,
@@ -103,8 +101,6 @@ def hyper_opt_classifier(
             best_score = np.max(xgb_param_tuning.evals_result()["validation_0"][eval_metric])
         else:
             best_score = np.min(xgb_param_tuning.evals_result()["validation_0"][eval_metric])
-        # Extract the best score
-        best_score = 1
 
         return best_score
 
