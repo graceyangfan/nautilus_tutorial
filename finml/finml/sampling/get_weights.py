@@ -34,7 +34,7 @@ def count_events_per_bar(bar_times, event_times):
     res = pl.DataFrame(
         {
             "index":bar_times[event_times_iloc1:event_times_iloc2 + 1].to_numpy().flatten(),
-            "values": np.zeros(event_times_iloc2-event_times_iloc1 + 1)
+            "values": np.zeros(event_times_iloc2-event_times_iloc1)
         }
     )
     for event_starts,event_ends in event_times.iter_rows():

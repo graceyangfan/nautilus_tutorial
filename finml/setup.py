@@ -20,8 +20,8 @@ setup(
         "pandas",
         "scipy",
         "xgboost",
-        "ray_xgboost",
+        "xgboost_ray",
         "optuna",
-        
+        "scikit-learn"
     ],
 )

@@ -6,10 +6,11 @@ import polars as pl
 import pandas as pd
 import numpy as np
 import glob
-import matplotlib.pyplot as plt
+import os
+#import matplotlib.pyplot as plt
 import pyarrow as pa
-from get_label import create_label 
-from get_weights import * 
+from finml.labeling.get_label import create_label
+from finml.sampling.get_weights import * 
 
 ExtendedBar_SCHEMA  = pa.schema(
         {
@@ -37,28 +38,35 @@ ExtendedBar_SCHEMA  = pa.schema(
 )
 
 if __name__ == "__main__":
-    filenames = glob.glob("../../catalog/data/genericdata_extended_bar.parquet/*.parquet")
-    df = pl.read_parquet(
-        filenames[0],
-        use_pyarrow=True,
-        pyarrow_options={"schema": ExtendedBar_SCHEMA}
-    )
-    df = df.select(
-    [pl.all(),pl.col("ts_event").alias("datetime")]
-    )
+    import os
+    bar_type = "ETHBUSD-PERP.BINANCE-850000-VALUE-LAST-EXTERNAL"
+    df = pl.read_parquet(os.path.join("train",bar_type+".parquet"))
+    if '__index_level_0__' in df.columns:
+        df = df.drop(['__index_level_0__'])
     labeled_df = create_label(
-        df,
-        threshold = 0.01,
-        stop_loss = 0.005,
-    )
-    np.random.seed(42)
-    events = labeled_df.select([pl.col("event_starts"),pl.col("event_ends")])
-    bars = labeled_df.select([pl.col("datetime"),pl.col("close")])
+            df,
+            threshold = 0.01,
+            stop_loss = 0.005,
+        )
+    del df 
+    total_indexs = [] 
+    labeled_df_size = labeled_df.shape[0]
+    for i in range(10):
+        sub_df = labeled_df[int(labeled_df_size/10*i):int(labeled_df_size/10*(i+1)),:]
+        np.random.seed(42)
+        events = sub_df.select([pl.col("event_starts"),pl.col("event_ends")])
+        bars = sub_df.select([pl.col("datetime"),pl.col("close")])
+        sample_size = sub_df.shape[0]/10
+        del sub_df 
+        events_indicators = get_event_indicators(bars,events,njobs =1)
+        sample_indexs = sample_sequential_bootstrap(events_indicators, size= sample_size)
+        del events_indicators
+        real_indexs = [item + int(labeled_df_size/10*i)  for item in sample_indexs]
+        total_indexs.extend(real_indexs)
 
-    events_indicators = get_event_indicators(bars,events)
-    sample_indexs = sample_sequential_bootstrap(events_indicators, size=100)
+    
     import pickle
     with open('sample_indexs.pkl', 'wb') as f:
-        pickle.dump(sample_indexs, f)
+        pickle.dump(total_indexs, f)
 
 

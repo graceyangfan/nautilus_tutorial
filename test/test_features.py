@@ -44,6 +44,12 @@ def ms_feature_evaluate(df):
         bar_based_kyle_lambda = [] 
         bar_based_amihud_lambda = [] 
         bar_based_hasbrouck_lambda = [] 
+        trade_based_kyle_lambda_0 = [] 
+        trade_based_amihud_lambda_0 = [] 
+        trade_based_hasbrouck_lambda_0 = [] 
+        trade_based_kyle_lambda_1 = [] 
+        trade_based_amihud_lambda_1 = [] 
+        trade_based_hasbrouck_lambda_1 = [] 
         vpin = [] 
         datetime = [] 
         for j in range(df.shape[0]):
@@ -62,6 +68,12 @@ def ms_feature_evaluate(df):
                 bar_based_kyle_lambda.append(np.nan)
                 bar_based_amihud_lambda.append(np.nan)
                 bar_based_hasbrouck_lambda.append(np.nan)
+                trade_based_kyle_lambda_0.append(np.nan)
+                trade_based_amihud_lambda_0.append(np.nan)
+                trade_based_hasbrouck_lambda_0.append(np.nan)
+                trade_based_kyle_lambda_1.append(np.nan)
+                trade_based_amihud_lambda_1.append(np.nan)
+                trade_based_hasbrouck_lambda_1.append(np.nan)
                 vpin.append(np.nan)
             else:
                 roll_effective_spread_0.append(ms.roll_effective_spread()[0])
@@ -76,6 +88,12 @@ def ms_feature_evaluate(df):
                 bar_based_kyle_lambda.append(ms.bar_based_kyle_lambda())
                 bar_based_amihud_lambda.append(ms.bar_based_amihud_lambda())
                 bar_based_hasbrouck_lambda.append(ms.bar_based_hasbrouck_lambda())
+                trade_based_kyle_lambda_0.append(ms.trades_based_kyle_lambda()[0])
+                trade_based_amihud_lambda_0.append(ms.trades_based_amihud_lambda()[0])
+                trade_based_hasbrouck_lambda_0.append(ms.trades_based_hasbrouck_lambda()[0])
+                trade_based_kyle_lambda_1.append(ms.trades_based_kyle_lambda()[1])
+                trade_based_amihud_lambda_1.append(ms.trades_based_amihud_lambda()[1])
+                trade_based_hasbrouck_lambda_1.append(ms.trades_based_hasbrouck_lambda()[1])
                 vpin.append(ms.vpin())
                 
         factor = pd.DataFrame({
@@ -92,6 +110,12 @@ def ms_feature_evaluate(df):
             "bar_based_kyle_lambda" : bar_based_kyle_lambda,
             "bar_based_amihud_lambda" : bar_based_amihud_lambda,
             "bar_based_hasbrouck_lambda" : bar_based_hasbrouck_lambda,
+            "trade_based_kyle_lambda_0":trade_based_kyle_lambda_0,
+            "trade_based_amihud_lambda_0":trade_based_amihud_lambda_0,
+            "trade_based_hasbrouck_lambda_0":trade_based_hasbrouck_lambda_0,
+            "trade_based_kyle_lambda_1":trade_based_kyle_lambda_1,
+            "trade_based_amihud_lambda_1":trade_based_amihud_lambda_1,
+            "trade_based_hasbrouck_lambda_1":trade_based_hasbrouck_lambda_1,
             "vpin" : vpin
         })
         label = df.select([pl.col('datetime'),pl.col("label")])
@@ -136,7 +160,7 @@ def test_entropy(df, labeled_df):
         print(f"the period {period} factor corrections are {corr.label}")
 
 
-def test_diff(df):
+def test_diff(df,col):
     label = df.select([pl.col('datetime'),pl.col("label")])
     for order in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]:
         for period in range(50,500,50):
@@ -144,7 +168,7 @@ def test_diff(df):
             value = [] 
             datetime = [] 
             for j in range(df.shape[0]):
-                    frac_dif.update_raw(df[j,"close"])
+                    frac_dif.update_raw(df[j,col])
                     datetime.append(df[j,"datetime"])
                     if not frac_dif.initialized():
                         value.append(np.nan)
@@ -283,7 +307,7 @@ def test_zscore(df):
             value_level_3_diff_zscore.update_raw(df[j,"bids_value_level_3"]-df[j,"asks_value_level_3"])
             value_level_4_diff_zscore.update_raw(df[j,"bids_value_level_4"]-df[j,"asks_value_level_4"])
             datetime.append(df[j,"datetime"])
-            if not bids_value_level_0_zscore.initialized():
+            if not bids_value_level_0_zscore.initialized:
                 bids_value_level_0_zscore_list.append(np.nan)
                 bids_value_level_1_zscore_list.append(np.nan)
                 bids_value_level_2_zscore_list.append(np.nan)
@@ -315,31 +339,31 @@ def test_zscore(df):
                 value_level_2_diff_zscore_list.append(value_level_2_diff_zscore.value)
                 value_level_3_diff_zscore_list.append(value_level_3_diff_zscore.value)
                 value_level_4_diff_zscore_list.append(value_level_4_diff_zscore.value)
-            factor = pd.DataFrame({
-                "datetime":datetime,
-                "bids_value_level_0_zscore" : bids_value_level_0_zscore_list,
-                "bids_value_level_1_zscore" : bids_value_level_1_zscore_list,
-                "bids_value_level_2_zscore" : bids_value_level_2_zscore_list,
-                "bids_value_level_3_zscore" : bids_value_level_3_zscore_list,
-                "bids_value_level_4_zscore" : bids_value_level_4_zscore_list,
-                "asks_value_level_0_zscore" : asks_value_level_0_zscore_list,
-                "asks_value_level_1_zscore" : asks_value_level_1_zscore_list,
-                "asks_value_level_2_zscore" : asks_value_level_2_zscore_list,
-                "asks_value_level_3_zscore" : asks_value_level_3_zscore_list,
-                "asks_value_level_4_zscore" : asks_value_level_4_zscore_list,
-                "value_level_0_diff_zscore" : value_level_0_diff_zscore_list,
-                "value_level_1_diff_zscore" : value_level_1_diff_zscore_list,
-                "value_level_2_diff_zscore" : value_level_2_diff_zscore_list,
-                "value_level_3_diff_zscore" : value_level_3_diff_zscore_list,
-                "value_level_4_diff_zscore" : value_level_4_diff_zscore_list,
-            })
-            label = df.select([pl.col('datetime'),pl.col("label")])
-            corr = corrections(
-                factor,
-                label,
-                corr_type ="pearson",
-            )
-            print(f"the period {period} factor corrections are {corr.label}")
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "bids_value_level_0_zscore" : bids_value_level_0_zscore_list,
+            "bids_value_level_1_zscore" : bids_value_level_1_zscore_list,
+            "bids_value_level_2_zscore" : bids_value_level_2_zscore_list,
+            "bids_value_level_3_zscore" : bids_value_level_3_zscore_list,
+            "bids_value_level_4_zscore" : bids_value_level_4_zscore_list,
+            "asks_value_level_0_zscore" : asks_value_level_0_zscore_list,
+            "asks_value_level_1_zscore" : asks_value_level_1_zscore_list,
+            "asks_value_level_2_zscore" : asks_value_level_2_zscore_list,
+            "asks_value_level_3_zscore" : asks_value_level_3_zscore_list,
+            "asks_value_level_4_zscore" : asks_value_level_4_zscore_list,
+            "value_level_0_diff_zscore" : value_level_0_diff_zscore_list,
+            "value_level_1_diff_zscore" : value_level_1_diff_zscore_list,
+            "value_level_2_diff_zscore" : value_level_2_diff_zscore_list,
+            "value_level_3_diff_zscore" : value_level_3_diff_zscore_list,
+            "value_level_4_diff_zscore" : value_level_4_diff_zscore_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr.label}")
 
 
 
@@ -395,7 +419,7 @@ def test_vidya(df):
             value_level_3_diff_vidya.update_raw(df[j,"bids_value_level_3"]-df[j,"asks_value_level_3"])
             value_level_4_diff_vidya.update_raw(df[j,"bids_value_level_4"]-df[j,"asks_value_level_4"])
             datetime.append(df[j,"datetime"])
-            if not bids_value_level_0_vidya.initialized():
+            if not bids_value_level_0_vidya.initialized:
                 bids_value_level_0_vidya_list.append(np.nan)
                 bids_value_level_1_vidya_list.append(np.nan)
                 bids_value_level_2_vidya_list.append(np.nan)
@@ -427,28 +451,28 @@ def test_vidya(df):
                 value_level_2_diff_vidya_list.append(value_level_2_diff_vidya.value)
                 value_level_3_diff_vidya_list.append(value_level_3_diff_vidya.value)
                 value_level_4_diff_vidya_list.append(value_level_4_diff_vidya.value)
-            factor = pd.DataFrame({
-                "datetime":datetime,
-                "bids_value_level_0_vidya" : bids_value_level_0_vidya_list,
-                "bids_value_level_1_vidya" : bids_value_level_1_vidya_list,
-                "bids_value_level_2_vidya" : bids_value_level_2_vidya_list,
-                "bids_value_level_3_vidya" : bids_value_level_3_vidya_list,
-                "bids_value_level_4_vidya" : bids_value_level_4_vidya_list,
-                "asks_value_level_0_vidya" : asks_value_level_0_vidya_list,
-                "asks_value_level_1_vidya" : asks_value_level_1_vidya_list,
-                "asks_value_level_2_vidya" : asks_value_level_2_vidya_list,
-                "asks_value_level_3_vidya" : asks_value_level_3_vidya_list,
-                "asks_value_level_4_vidya" : asks_value_level_4_vidya_list,
-                "value_level_0_diff_vidya" : value_level_0_diff_vidya_list,
-                "value_level_1_diff_vidya" : value_level_1_diff_vidya_list,
-                "value_level_2_diff_vidya" : value_level_2_diff_vidya_list,
-                "value_level_3_diff_vidya" : value_level_3_diff_vidya_list,
-                "value_level_4_diff_vidya" : value_level_4_diff_vidya_list,
-            })
-            label = df.select([pl.col('datetime'),pl.col("label")])
-            corr = corrections(
-                factor,
-                label,
-                corr_type ="pearson",
-            )
-            print(f"the period {period} factor corrections are {corr.label}")
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "bids_value_level_0_vidya" : bids_value_level_0_vidya_list,
+            "bids_value_level_1_vidya" : bids_value_level_1_vidya_list,
+            "bids_value_level_2_vidya" : bids_value_level_2_vidya_list,
+            "bids_value_level_3_vidya" : bids_value_level_3_vidya_list,
+            "bids_value_level_4_vidya" : bids_value_level_4_vidya_list,
+            "asks_value_level_0_vidya" : asks_value_level_0_vidya_list,
+            "asks_value_level_1_vidya" : asks_value_level_1_vidya_list,
+            "asks_value_level_2_vidya" : asks_value_level_2_vidya_list,
+            "asks_value_level_3_vidya" : asks_value_level_3_vidya_list,
+            "asks_value_level_4_vidya" : asks_value_level_4_vidya_list,
+            "value_level_0_diff_vidya" : value_level_0_diff_vidya_list,
+            "value_level_1_diff_vidya" : value_level_1_diff_vidya_list,
+            "value_level_2_diff_vidya" : value_level_2_diff_vidya_list,
+            "value_level_3_diff_vidya" : value_level_3_diff_vidya_list,
+            "value_level_4_diff_vidya" : value_level_4_diff_vidya_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr.label}")

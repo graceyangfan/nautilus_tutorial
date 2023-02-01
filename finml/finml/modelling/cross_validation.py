@@ -6,13 +6,14 @@ def _get_purged_train_indices(event_times, test_times):
         [pl.all(), pl.arange(0, pl.count()).alias("count_index")]
     )
     train_times = event_times.clone()
+    overlap_df = pl.DataFrame([])
     for test_start,test_end in test_times.iter_rows():
         overlap1 = event_times.filter((test_start<=pl.col("event_starts")) & (pl.col("event_starts") <= test_end))
         overlap2 = event_times.filter((test_start<=pl.col("event_ends")) & (pl.col("event_ends") <= test_end))
         overlap3 = event_times.filter((test_start>=pl.col("event_starts")) & (pl.col("event_ends") >= test_end))
-        overlap = pl.concat([overlap1,overlap2,overlap3],how="vertical").unique()
-        train_times = train_times.join(overlap,on ="event_ends",how ="anti")        
-    return train_times.select("count_index").to_numpy().flatten()
+        overlap_df = pl.concat([overlap_df,overlap1,overlap2,overlap3],how="vertical").unique()
+    train_times = train_times.join(overlap_df,on ="event_ends",how ="anti")        
+    return train_times.select("count_index").to_numpy().flatten().tolist()
 
 
 def _get_embargo_times(bar_times, embargo_pct):

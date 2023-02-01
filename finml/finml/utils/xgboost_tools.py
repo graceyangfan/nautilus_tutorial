@@ -37,4 +37,4 @@ def preidct_prob(
     results = [] 
     for model in models:
         results.append(model.predict_proba(feature))
-    return np.mean(results,axis=0)
+    return np.mean(results,axis=0)[0]

@@ -71,6 +71,7 @@ def hyper_opt_classifier(
             "booster": "gbtree",
             "num_class": num_class,
             "objective": object_func,
+            "learning_rate": trial.suggest_float("learning_rate", params["learning_rate"][0], params["learning_rate"][1],log = True),
             "eta": trial.suggest_float("eta", params["eta"][0], params["eta"][1],log = True),
             "max_depth": trial.suggest_int("max_depth", params["max_depth"][0], params["max_depth"][1]),
             "gamma": trial.suggest_float("gamma", params["gamma"][0], params["gamma"][1],log = True),
@@ -133,6 +134,8 @@ def fit_xgboost(
     num_class,
     num_actors,
     cpus_per_actor,
+    sample_weight = None,
+    sample_weight_eval_set = None,
     early_stopping_rounds = 20,
     eval_metric= "auc",
     direction='maximize',
@@ -140,7 +143,9 @@ def fit_xgboost(
     np.random.seed(123)
 
     # Specifies the parameters and their value range. The structure is as follows: "hyper-parameter": [lower_bound, upper_bound]. Currently, only the following hyper-parameters can be optimized:
-    params = {"eta": [1e-5, 1],                   
+    params = {
+            "learning_rate":[1e-4,1],
+            "eta": [1e-5, 1],                   
             "max_depth": [1, 5],
             "gamma": [1e-8, 40],
             "subsample": [0.2, 1.0],
@@ -159,6 +164,8 @@ def fit_xgboost(
         early_stopping_rounds=early_stopping_rounds,
         eval_metric= eval_metric,
         direction=direction,
+        sample_weight=sample_weight,
+        sample_weight_eval_set= sample_weight_eval_set,
         verbose_eval = 100,
         max_minutes=120,           # Time budget in minutes, i.e., stop study after the given number of minutes.
         n_trials=30,             # The number of trials. If this argument is set to None, there is no limitation on the number of trials.
@@ -180,6 +187,8 @@ def fit_xgboost(
         verbose = 100,
         eval_metric = eval_metric,
         early_stopping_rounds=20,
+        sample_weight=sample_weight,
+        sample_weight_eval_set= sample_weight_eval_set,
     )
 
     return xgboostlss_model,best_score 
@@ -188,6 +197,7 @@ def fit_xgboost(
 def CV_train_classifier(
     X, 
     y, 
+    sample_weight,
     num_groups, 
     num_test_groups, 
     bar_times, 
@@ -214,6 +224,9 @@ def CV_train_classifier(
         X_test = X_test.to_pandas()
         y_train = y_train.to_pandas()
         y_test = y_test.to_pandas()
+
+        train_sample_weight = sample_weight[train_indices, :].to_pandas().values.reshape(-1,)
+        test_sample_weight = sample_weight[test_indices, :].to_pandas().values.reshape(-1,)
         if len(np.unique(y_train)) < num_class:
             continue
         model, score = fit_xgboost(
@@ -224,6 +237,8 @@ def CV_train_classifier(
             num_class = num_class,
             num_actors=num_actors,
             cpus_per_actor=cpus_per_actor,
+            sample_weight = train_sample_weight,
+            sample_weight_eval_set = [test_sample_weight],
         )
         models.append(model)
         gc.collect()

@@ -76,8 +76,11 @@ def create_label(
         [pl.all(), (pl.col("prevext")/pl.col("close") - 1.0).alias("label")]
     )
     correct_label = [] 
+    event_ends = [] 
     if stop_loss:
         total_returns = df.select("label").to_numpy().flatten() 
+        original_event_ends = df.select("event_ends").to_numpy().flatten() 
+        original_datetime = df.select("datetime").to_numpy().flatten() 
         return_list = df.select(
             ((pl.col("close").shift(-1) - pl.col("close"))/pl.col("close")).alias("return")
         )
@@ -92,22 +95,30 @@ def create_label(
                 local_returns = return_list[j:min(end_idx + 1,len(return_list))]
                 min_acc = 0 
                 if total_returns[j] > 0:
-                    min_acc = min((min(close_array[j+1:end_idx+1])-close_array[j])/close_array[j],0)
+                    min_acc_arg = np.argmin(close_array[j+1:end_idx+1]) + j+1
+                    min_acc = min((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
                 else:
-                    min_acc = max((max(close_array[j+1:end_idx+1])-close_array[j])/close_array[j],0)
+                    min_acc_arg = np.argmax(close_array[j+1:end_idx+1]) + j+1
+                    min_acc = max((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
                 if total_returns[j] > 0:
                     if min_acc > -stop_loss:
                         correct_label.append(total_returns[j])
+                        event_ends.append(original_event_ends[j])
                     else:
                         correct_label.append(min_acc)
+                        event_ends.append(original_datetime[min_acc_arg])
                 else:
                     if min_acc < stop_loss:
                         correct_label.append(total_returns[j])
+                        event_ends.append(original_event_ends[j])
                     else:
                         correct_label.append(min_acc)
+                        event_ends.append(original_datetime[min_acc_arg])
         #replace label of df 
         df = df[:len(correct_label),:]
         df.replace("label",pl.Series(correct_label))
+        df.replace("event_ends",pl.Series(event_ends))
+
 
     ## drop the front data because zigzag is meanless on these data 
     df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"]))
