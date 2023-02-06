@@ -37,6 +37,7 @@ def count_events_per_bar(bar_times, event_times):
             "values": np.zeros(event_times_iloc2-event_times_iloc1)
         }
     )
+    event_times = event_times.select([pl.col("event_starts"),pl.col("event_ends")])
     for event_starts,event_ends in event_times.iter_rows():
         res = res.with_column(
             pl.when((pl.col("index") >= event_starts) & (pl.col("index") <= event_ends))
@@ -58,6 +59,7 @@ def label_avg_uniqueness(bars, events):
             "values": np.zeros(events.shape[0])
         }
     )
+    events = events.select([pl.col("event_starts"),pl.col("event_ends")])
     for event_starts,event_ends in events.iter_rows():
         res = res.with_column(
             pl.when((pl.col("index") == event_starts))
@@ -73,7 +75,7 @@ def get_event_indicators(bar_times, event_times, njobs = 1):
     params = [{"res":res,
                "event_starts":event_times[i,"event_starts"],
                "event_ends":event_times[i,"event_ends"],
-              "i":i} for i in range(event_times.shape[0])]
+              "count_index":event_times[i,"count_index"],} for i in range(event_times.shape[0])]
     indicators = Parallel(n_jobs=njobs)(delayed(_get_event_indicator)(param) for param in tqdm(params))
     return pl.concat(indicators, how="horizontal")
     
@@ -82,7 +84,7 @@ def _get_event_indicator(params):
             pl.when((pl.col("index")>= params["event_starts"])&(pl.col("index")<= params["event_ends"]))
             .then(1)
             .otherwise(0)
-            .alias(str(params["i"]))
+            .alias(str(params["count_index"]))
         )
 
 def sample_sequential_bootstrap(event_indicators, size=None):
@@ -119,7 +121,7 @@ def sample_sequential_bootstrap(event_indicators, size=None):
     
 
 def _get_return_attributions(event_times, events_counts, bars):
-    returns = bars.select([pl.col("Close").log().diff().alias("values"),pl.col("datetime").alias("index")])
+    returns = bars.select([pl.col("close").log().diff().alias("values"),pl.col("datetime").alias("index")])
     weights = pl.DataFrame(
         {
             "index":event_times.select("event_starts").to_numpy().flatten(),

@@ -37,3 +37,17 @@ def corrections(
     df = factor.merge(label,left_on="datetime",right_on="datetime",how="right")
     df = df.drop(columns=["datetime"])
     return df.corr(method=corr_type)
+
+def test_imbalance_corr(df):
+    df = df.select(
+    [
+        pl.col("buyer_maker_imbalance"),
+        pl.col("label"),
+    ])
+    df_train = df[:int(0.7*df.shape[0])]
+    df_test = df[int(0.7*df.shape[0]):]
+    in_sample_coor = df_train.pearson_corr()[0,"label"]
+    out_sample_coor = df_test.pearson_corr()[0,"label"]
+    print(f'the in sample corr of buyer_maker_imbalance  is {in_sample_coor}')
+    print(f'the out sample corr of buyer_maker_imbalance  is {out_sample_coor}')
+    return [in_sample_coor,out_sample_coor]

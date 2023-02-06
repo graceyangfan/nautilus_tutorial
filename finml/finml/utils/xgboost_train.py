@@ -224,9 +224,12 @@ def CV_train_classifier(
         X_test = X_test.to_pandas()
         y_train = y_train.to_pandas()
         y_test = y_test.to_pandas()
-
-        train_sample_weight = sample_weight[train_indices, :].to_pandas().values.reshape(-1,)
-        test_sample_weight = sample_weight[test_indices, :].to_pandas().values.reshape(-1,)
+        if sample_weight is None:
+            train_sample_weight = None 
+            test_sample_weight = None 
+        else:
+            train_sample_weight = sample_weight[train_indices, :].to_pandas().values.reshape(-1,)
+            test_sample_weight = [sample_weight[test_indices, :].to_pandas().values.reshape(-1,)]
         if len(np.unique(y_train)) < num_class:
             continue
         model, score = fit_xgboost(
@@ -238,7 +241,7 @@ def CV_train_classifier(
             num_actors=num_actors,
             cpus_per_actor=cpus_per_actor,
             sample_weight = train_sample_weight,
-            sample_weight_eval_set = [test_sample_weight],
+            sample_weight_eval_set = test_sample_weight,
         )
         models.append(model)
         gc.collect()
