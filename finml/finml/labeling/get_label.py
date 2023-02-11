@@ -21,6 +21,7 @@ def create_label(
     threshold = 0.02,
     stop_loss = None,
     cut_label = True,
+    log_return = True,
 ):
     zigzags = []
     for idx,item in enumerate(df.select(["datetime","close"]).iter_rows()):
@@ -151,5 +152,12 @@ def create_label(
     df = df.select(
             [pl.all(), pl.arange(0, pl.count()).alias("count_index")]
         )
+    if log_return:
+        df = df.with_columns(
+            [
+                (pl.col("label")+1.0).log().alias("label"),
+            ]
+        )
+
     return df 
 

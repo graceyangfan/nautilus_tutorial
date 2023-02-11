@@ -87,22 +87,22 @@ def zscore_filter(bars,period,threshold,lambda_value):
             pl.col("quantity").sum().alias("volume"),
             (
                 (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")<lambda_value)
+                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")<lambda_value)
                 )
             ).sum().alias("small_buy_value"),
             (
                 (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")>lambda_value)
+                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")>lambda_value)
                 )
             ).sum().alias("big_buy_value"),
             (
                 (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")<lambda_value)
+                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")<lambda_value)
                 )
             ).sum().alias("small_sell_value"),
             (
                 (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")>lambda_value)
+                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")>lambda_value)
                 )
             ).sum().alias("big_sell_value"),
         ]
@@ -133,7 +133,7 @@ def zscore_filter(bars,period,threshold,lambda_value):
             pl.col("big_sell_value"),
             pl.col("ts_init"),
             pl.col("ts_event"),
-            (pl.col("small_buy_value") + pl.col("big_buy_value") - pl.col("small_sell_value") - pl.col("big_sell_value")).alias("buyer_maker_imbalance"),
+            (pl.col("big_buy_value") - pl.col("big_sell_value")).alias("buyer_maker_imbalance"),
         ]
     )
     return newbars
