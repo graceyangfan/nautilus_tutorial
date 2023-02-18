@@ -127,7 +127,8 @@ def ms_feature_evaluate(df):
         print(f"the period {i} factor corrections are {corr.label}")
 
 
-def test_entropy(df, labeled_df):
+def test_entropy(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
     for period in range(50,500,50):
         en = Entropy(period,10,-0.05,0.05)
         shannon_entropy = [] 
@@ -151,7 +152,6 @@ def test_entropy(df, labeled_df):
             "plugin_entropy" : plugin_entropy,
             "konto_entropy" : konto_entropy,
         })
-        label = labeled_df.select([pl.col('datetime'),pl.col("label")])
         corr = corrections(
             factor,
             label,
@@ -476,3 +476,203 @@ def test_vidya(df):
             corr_type ="pearson",
         )
         print(f"the period {period} factor corrections are {corr.label}")
+
+
+from nautilus_trader.indicators.zscore import Zscore
+def test_zscore(df,col):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        zscore = Zscore(period)
+        datetime = [] 
+        zscore_list = [] 
+    
+        for j in range(df.shape[0]):
+            zscore.update_raw(df[j,col])
+            datetime.append(df[j,"datetime"])
+            if not zscore.initialized:
+                zscore_list.append(np.nan)
+            else:
+                zscore_list.append(zscore.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "zscore" : zscore_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")
+
+
+
+from nautilus_trader.indicators.rvi import RelativeVolatilityIndex
+def test_rvi(df,col):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        rvi = RelativeVolatilityIndex(period)
+        datetime = [] 
+        rvi_list = [] 
+    
+        for j in range(df.shape[0]):
+            rvi.update_raw(df[j,col])
+            datetime.append(df[j,"datetime"])
+            if not rvi.initialized:
+                rvi_list.append(np.nan)
+            else:
+                rvi_list.append(rvi.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "rvi" : rvi_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")
+
+
+from nautilus_trader.indicators.pgo import PrettyGoodOscillator 
+def test_pgo(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        pgo =PrettyGoodOscillator(period)
+        datetime = [] 
+        pgo_list = [] 
+    
+        for j in range(df.shape[0]):
+            pgo.update_raw(df[j,"high"],df[j,"low"],df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not pgo.initialized:
+                pgo_list.append(np.nan)
+            else:
+                pgo_list.append(pgo.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "pgo" : pgo_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")
+
+from features.features import RollStats
+def test_value_diff(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(10,100,10):
+        factor  = df.select([
+            pl.col("datetime"),
+            pl.col('small_buy_value').rolling_mean(period).alias("small_buy_value_mean"),
+            pl.col('big_buy_value').rolling_mean(period).alias("big_buy_value_mean"),
+            pl.col('small_sell_value').rolling_mean(period).alias("small_sell_value_mean"),
+            pl.col('big_sell_value').rolling_mean(period).alias("big_sell_value_mean"),
+            (pl.col('small_buy_value') - pl.col('small_sell_value')).alias("level_0_diff_mean").rolling_mean(period),
+            (pl.col('big_buy_value') - pl.col('big_sell_value')).alias("level_1_diff_mean").rolling_mean(period),
+            pl.col('small_buy_value').rolling_std(period).alias("small_buy_value_std"),
+            pl.col('big_buy_value').rolling_std(period).alias("big_buy_value_std"),
+            pl.col('small_sell_value').rolling_std(period).alias("small_sell_value_std"),
+            pl.col('big_sell_value').rolling_std(period).alias("big_sell_value_std"),
+            (pl.col('small_buy_value') - pl.col('small_sell_value')).alias("level_0_diff_std").rolling_std(period),
+            (pl.col('big_buy_value') - pl.col('big_sell_value')).alias("level_1_diff_std").rolling_std(period),
+
+            pl.col('small_buy_value').rolling_skew(period).alias("small_buy_value_skew"),
+            pl.col('big_buy_value').rolling_skew(period).alias("big_buy_value_skew"),
+            pl.col('small_sell_value').rolling_skew(period).alias("small_sell_value_skew"),
+            pl.col('big_sell_value').rolling_skew(period).alias("big_sell_value_skew"),
+            (pl.col('small_buy_value') - pl.col('small_sell_value')).alias("level_0_diff_skew").rolling_skew(period),
+            (pl.col('big_buy_value') - pl.col('big_sell_value')).alias("level_1_diff_skew").rolling_skew(period),
+        ])
+        small_buy_value_kurt = RollStats(period)
+        big_buy_value_kurt = RollStats(period)
+        small_sell_value_kurt = RollStats(period)
+        big_sell_value_kurt = RollStats(period)
+        level_0_diff_kurt = RollStats(period)
+        level_1_diff_kurt = RollStats(period)
+
+        datetime = [] 
+        small_buy_value_kurt_list = [] 
+        big_buy_value_kurt_list = [] 
+        small_sell_value_kurt_list = [] 
+        big_sell_value_kurt_list = [] 
+        level_0_diff_kurt_list = [] 
+        level_1_diff_kurt_list = [] 
+    
+        for j in range(df.shape[0]):
+            small_buy_value_kurt.update_raw(df[j,'small_buy_value'])
+            big_buy_value_kurt.update_raw(df[j,'big_buy_value'])
+            small_sell_value_kurt.update_raw(df[j,'small_sell_value'])
+            big_sell_value_kurt.update_raw(df[j,'big_sell_value'])
+            level_0_diff_kurt.update_raw(df[j,'small_buy_value'] -df[j,'small_sell_value'])
+            level_1_diff_kurt.update_raw(df[j,'big_buy_value']-df[j,'big_sell_value'])
+            datetime.append(df[j,"datetime"])
+            if not small_buy_value_kurt.initialized():
+                small_buy_value_kurt_list.append(np.nan)
+                big_buy_value_kurt_list.append(np.nan)
+                small_sell_value_kurt_list.append(np.nan)
+                big_sell_value_kurt_list.append(np.nan)
+                level_0_diff_kurt_list.append(np.nan)
+                level_1_diff_kurt_list.append(np.nan)
+            else:
+                small_buy_value_kurt_list.append(small_buy_value_kurt.kurt())
+                big_buy_value_kurt_list.append(big_buy_value_kurt.kurt())
+                small_sell_value_kurt_list.append(small_sell_value_kurt.kurt())
+                big_sell_value_kurt_list.append(big_sell_value_kurt.kurt())
+                level_0_diff_kurt_list.append(level_0_diff_kurt.kurt())
+                level_1_diff_kurt_list.append(level_1_diff_kurt.kurt())
+        factor2 = pl.DataFrame({
+                "small_buy_value_kurt":small_buy_value_kurt_list,
+                "big_buy_value_kurt":big_buy_value_kurt_list,
+                "small_sell_value_kurt":small_sell_value_kurt_list,
+                "big_sell_value_kurt":big_sell_value_kurt_list,
+                "level_0_diff_kurt":level_0_diff_kurt_list,
+                "level_1_diff_kurt":level_1_diff_kurt_list,
+        })
+        factor = pl.concat([factor,factor2],how='horizontal')
+        corr = corrections(
+                    factor,
+                    label,
+                    corr_type ="pearson",
+                )
+        #return corr
+        print(f"the period {period} factor corrections are {corr}")
+
+from nautilus_trader.indicators.zigzag import Zigzag
+import pandas as pd 
+def test_zigzag(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for change_percent in range(0.005,0.05,0.005):
+        zigzag =Zigzag(change_percent)
+        datetime = [] 
+        zigzag_value_list = [] 
+        zigzag_strength_list = []     
+        for j in range(df.shape[0]):
+            zigzag.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"],pd.Timestamp(df[j,ts_event], tz="UTC"))
+            datetime.append(df[j,"datetime"])
+            if not zigzag.initialized:
+                zigzag_value_list.append(np.nan)
+                zigzag_strength_list.append(np.nan)
+            else:
+                if zigzag.zigzag_direction == 1:
+                    zigzag_value_list.append((zigzag.high_price-df[j,"close"])/zigzag.length)
+                    zigzag_strength_list.append(zigzag.zigzag_direction*zigzag.length/zigzag.low_price)
+                else:
+                    zigzag_value_list.append((-zigzag.low_price+df[j,"close"])/zigzag.length)
+                    zigzag_strength_list.append(zigzag.zigzag_direction*zigzag.length/zigzag.high_price)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "zigzag" : zigzag_value_list,
+            "zigzag_strength":zigzag_strength_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the change_percent {change_percent} factor corrections are {corr}")

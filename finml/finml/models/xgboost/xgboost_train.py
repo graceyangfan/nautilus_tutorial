@@ -4,7 +4,7 @@ import polars as pl
 from xgboost_ray import RayParams
 from xgboost_ray.sklearn import RayXGBClassifier
 import optuna 
-from finml.backtest.backtest import CombinatorialPurgedCV
+from finml.evaluation.cross_validation import CombinatorialPurgedCV
 
 def train_classifier(
     params, 
@@ -69,7 +69,6 @@ def hyper_opt_classifier(
     def objective(trial):
         hyper_params = {
             "booster": "gbtree",
-            "num_class": num_class,
             "objective": object_func,
             "learning_rate": trial.suggest_float("learning_rate", params["learning_rate"][0], params["learning_rate"][1],log = True),
             "eta": trial.suggest_float("eta", params["eta"][0], params["eta"][1],log = True),
@@ -79,6 +78,8 @@ def hyper_opt_classifier(
             "colsample_bytree": trial.suggest_float("colsample_bytree", params["colsample_bytree"][0], params["colsample_bytree"][1],log = True),
             "min_child_weight": trial.suggest_int("min_child_weight", params["min_child_weight"][0], params["min_child_weight"][1])
         }
+        if  num_class > 2:
+            hyper_params.update({"num_class": num_class})
         # Add pruning
         pruning_callback = optuna.integration.XGBoostPruningCallback(trial, "validation_0-"+eval_metric)
 

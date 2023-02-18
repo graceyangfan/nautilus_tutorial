@@ -137,3 +137,4 @@ def zscore_filter(bars,period,threshold,lambda_value):
         ]
     )
     return newbars
+

@@ -19,9 +19,13 @@ setup(
         "numpy",
         "pandas",
         "scipy",
+        "ray[rllib]",
         "xgboost",
         "xgboost_ray",
         "optuna",
-        "scikit-learn"
+        "scikit-learn",
+        "matplotlib",
+        "torch",
+        "torchmetrics"
     ],
 )

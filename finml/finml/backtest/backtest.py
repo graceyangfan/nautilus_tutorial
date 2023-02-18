@@ -4,8 +4,8 @@ import numpy as np
 from scipy.stats import gaussian_kde
 import polars as pl 
 
-from ..modelling.metrics import sharpe_ratio 
-from ..modelling.cross_validation import apply_purging_and_embargo 
+from ..evaluation.metrics import sharpe_ratio 
+from ..evaluation.cross_validation import apply_purging_and_embargo 
 from ..utils.stats import KDERv 
 
 def compute_pbo(perm_matrix: np.ndarray, eval_fn=sharpe_ratio, n_partitions=10):
@@ -62,45 +62,3 @@ def compute_pbo(perm_matrix: np.ndarray, eval_fn=sharpe_ratio, n_partitions=10):
     kde_dist = KDERv(kde)
     pbo = kde_dist.cdf(0)
     return pbo, rank_logits, train_optimal_perm, test_assoc_perm
-
-
-
-class CombinatorialPurgedCV:
-    def __init__(self, num_groups, num_test_groups, bar_times, event_times, embargo_pct=0.):
-        self.num_groups = num_groups
-        self.num_test_groups = num_test_groups
-        self.bar_times = bar_times
-        self.event_times = event_times
-        self.embargo_pct = embargo_pct
-
-        self.num_obs = event_times.shape[0]
-        self.group_size = self.num_obs // self.num_groups
-        self.splits_of_test_groups = [[] for _ in range(num_groups)]
-
-    def split(self):
-        for split_index, test_groups in enumerate(combinations(range(self.num_groups), self.num_test_groups)):
-            test_indices = list(chain.from_iterable(
-                list(range(int(g * self.group_size), int((g + 1) * self.group_size)))
-                for g in test_groups
-            ))
-            test_times = self.event_times[test_indices,:]
-
-            train_indices = apply_purging_and_embargo(
-                self.event_times, test_times, self.bar_times, self.embargo_pct
-            )
-
-            for g in test_groups:
-                self.splits_of_test_groups[g].append(split_index)
-
-            yield train_indices, test_indices
-
-    def get_backtest_paths(self):
-        num_paths = min(len(splits) for splits in self.splits_of_test_groups)
-        for i in range(num_paths):
-            path_splits = [splits[i] for splits in self.splits_of_test_groups]
-            unique_path_splits = sorted(np.unique(path_splits))
-            test_indices = [
-                list(range(int(g * self.group_size), int((g + 1) * self.group_size)))
-                for g in unique_path_splits
-            ]
-            yield list(zip(test_indices, unique_path_splits))
