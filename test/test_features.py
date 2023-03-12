@@ -650,13 +650,19 @@ def test_zigzag(df):
         zigzag =Zigzag(change_percent)
         datetime = [] 
         zigzag_value_list = [] 
-        zigzag_strength_list = []     
+        zigzag_strength_list = []   
+        zizag_anchored_vwap_list = [] 
+        zizag_last_anchored_vwap_list = [] 
+        zigzag_volume_ratio_list = [] 
         for j in range(df.shape[0]):
-            zigzag.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"],pd.Timestamp(df[j,ts_event], tz="UTC"))
+            zigzag.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"],df[j,"volume"],pd.Timestamp(df[j,ts_event], tz="UTC"))
             datetime.append(df[j,"datetime"])
             if not zigzag.initialized:
                 zigzag_value_list.append(np.nan)
                 zigzag_strength_list.append(np.nan)
+                zizag_anchored_vwap_list.append(np.nan)
+                zizag_last_anchored_vwap_list.append(np.nan)
+                zigzag_volume_ratio_list.append(np.nan)
             else:
                 if zigzag.zigzag_direction == 1:
                     zigzag_value_list.append((zigzag.high_price-df[j,"close"])/zigzag.length)
@@ -664,10 +670,17 @@ def test_zigzag(df):
                 else:
                     zigzag_value_list.append((-zigzag.low_price+df[j,"close"])/zigzag.length)
                     zigzag_strength_list.append(zigzag.zigzag_direction*zigzag.length/zigzag.high_price)
+                zizag_anchored_vwap_list.append(df[j,"close"]/zigzag.zigzag_anchored_vwap)
+                zizag_last_anchored_vwap_list.append(df[j,"close"]/zigzag.last_zigzag_anchored_vwap)
+                zigzag_volume_ratio_list.append(df[j,"volume"]/zigzag.last_sum_volume/zigzag.last_anchored_bars)
+
         factor = pd.DataFrame({
             "datetime":datetime,
             "zigzag" : zigzag_value_list,
             "zigzag_strength":zigzag_strength_list,
+            "zizag_anchored_vwap":zizag_anchored_vwap_list,
+            "zizag_last_anchored_vwap":zizag_last_anchored_vwap_list,
+            "zigzag_volume_ratio":zigzag_volume_ratio_list,
         })
         label = df.select([pl.col('datetime'),pl.col("label")])
         corr = corrections(
@@ -676,3 +689,194 @@ def test_zigzag(df):
             corr_type ="pearson",
         )
         print(f"the change_percent {change_percent} factor corrections are {corr}")
+
+
+from nautilus_trader.indicators.eri import ElderRayIndex
+def test_eri(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        eri =ElderRayIndex(period)
+        datetime = [] 
+        eri_bull_list = [] 
+        eri_bear_list = [] 
+    
+        for j in range(df.shape[0]):
+            eri.update_raw(df[j,"high"],df[j,"low"],df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not eri.initialized:
+                eri_bull_list.append(np.nan)
+                eri_bear_list.append(np.nan)
+            else:
+                eri_bull_list.append(eri.bull)
+                eri_bear_list.append(eri.bear)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "eri_bull" : eri_bull_list,
+            "eri_bear" : eri_bear_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")
+
+
+from nautilus_trader.indicators.bias import Bias
+def test_bias(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        bias =Bias(period)
+        datetime = [] 
+        bias_list = [] 
+    
+        for j in range(df.shape[0]):
+            bias.update_raw(df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not bias.initialized:
+                bias_list.append(np.nan)
+            else:
+                bias_list.append(bias.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "bias" : bias_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")
+
+from nautilus_trader.indictaors.bop import BalanceOfPower 
+def test_bias(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    bias =Bias()
+    datetime = [] 
+    bias_list = [] 
+
+    for j in range(df.shape[0]):
+        bias.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"])
+        datetime.append(df[j,"datetime"])
+        if not bias.initialized:
+            bias_list.append(np.nan)
+        else:
+            bias_list.append(bias.value)
+    factor = pd.DataFrame({
+        "datetime":datetime,
+        "bias" : bias_list,
+    })
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    corr = corrections(
+        factor,
+        label,
+        corr_type ="pearson",
+    )
+    print(f"the factor corrections are {corr}")
+
+
+from nautilus_trader.indicators.rsi import RelativeStrengthIndex
+
+def test_rsi(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(500,3000,100):
+        rsi=RelativeStrengthIndex(period)
+        datetime = [] 
+        rsi_list = [] 
+    
+        for j in range(df.shape[0]):
+            rsi.update_raw(df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not rsi.initialized:
+                rsi_list.append(np.nan)
+            else:
+                rsi_list.append(rsi.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "rsi" : rsi_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        return corr
+
+
+from nautilus_trader.indicators.vortex import Vortex
+def test_vortex(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for pvortexod in range(50,500,50):
+        vortex =Vortex(pvortexod)
+        datetime = [] 
+        vortex_vip_list = [] 
+        vortex_vim_list = [] 
+    
+        for j in range(df.shape[0]):
+            vortex.update_raw(df[j,"high"],df[j,"low"],df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not vortex.initialized:
+                vortex_vip_list.append(np.nan)
+                vortex_vim_list.append(np.nan)
+            else:
+                vortex_vip_list.append(vortex.vip)
+                vortex_vim_list.append(vortex.vim)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "vortex_vip" : vortex_vip_list,
+            "vortex_vim" : vortex_vim_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the pvortexod {pvortexod} factor corrections are {corr}") 
+
+from nautilus_trader.indicators.linear_regression import LinearRegression
+def test_cfo(df):
+    label = df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(50,500,50):
+        cfo = LinearRegression(period)
+        datetime = [] 
+        slope_list = [] 
+        intercept_list = [] 
+        #degree_list = [] 
+        cfo_list = [] 
+        R2_list = [] 
+        value_list = [] 
+    
+        for j in range(df.shape[0]):
+            cfo.update_raw(df[j,"close"])
+            datetime.append(df[j,"datetime"])
+            if not cfo.initialized:
+                cfo_list.append(np.nan)
+                slope_list.append(np.nan)
+                intercept_list.append(np.nan)
+                R2_list.append(np.nan)
+                value_list.append(np.nan)
+            else:
+                cfo_list.append(cfo.cfo)
+                slope_list.append(cfo.slope)
+                intercept_list.append(cfo.intercept)
+                R2_list.append(cfo.R2)
+                value_list.append(cfo.value)
+        factor = pd.DataFrame({
+            "datetime":datetime,
+            "cfo" : cfo_list,
+            "slope":slope_list,
+            "intercept":intercept_list,
+            "R2":R2_list,
+            "value":value_list,
+        })
+        label = df.select([pl.col('datetime'),pl.col("label")])
+        corr = corrections(
+            factor,
+            label,
+            corr_type ="pearson",
+        )
+        print(f"the period {period} factor corrections are {corr}")

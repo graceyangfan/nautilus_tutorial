@@ -79,6 +79,7 @@ class GenericData(Strategy):
             'zscore',
             'rvi',
             "zizag_strength",
+            "zigzag_value",
             'vpin',
             'roll_effective_spread_1',
             'bar_based_kyle_lambda',
@@ -132,7 +133,7 @@ class GenericData(Strategy):
 
 
     def on_bar(self, data: ImbalanceBar):
-
+        self.bar_close = data.close.as_double()
         self.zscore.update_raw(
             data.close.as_double(),
         )
@@ -184,31 +185,31 @@ class GenericData(Strategy):
             return 
     
 
-        indicator_info = np.zeros((1,15)) 
+        indicator_info = np.zeros((1,16)) 
  
         indicator_info[0,0] = self.zscore.value 
         indicator_info[0,1] = self.rvi.value 
         if self.zigzag.zigzag_direction == 1:
             indicator_info[0,2] = self.zigzag.zigzag_direction*self.zigzag.length/self.zigzag.low_price
- 
+            indicator_info[0,3] = (self.zigzag.high_price-self.bar_close)/self.zigzag.length
         else:
             indicator_info[0,2] = self.zigzag.zigzag_direction*self.zigzag.length/self.zigzag.high_price
+            indicator_info[0,3] = (-self.zigzag.low_price+self.bar_close)/self.zigzag.length
 
-
-        indicator_info[0,3] = self.ms.vpin()
-        indicator_info[0,4] = self.ms.roll_effective_spread()[1]
-        indicator_info[0,5] = self.ms.bar_based_kyle_lambda()
-        indicator_info[0,6] = self.entropy.shannon_entropy()
+        indicator_info[0,4] = self.ms.vpin()
+        indicator_info[0,5] = self.ms.roll_effective_spread()[1]
+        indicator_info[0,6] = self.ms.bar_based_kyle_lambda()
+        indicator_info[0,7] = self.entropy.shannon_entropy()
        
-        indicator_info[0,7] = self.rollstats_level_0.kurt()
-        indicator_info[0,8] = self.rollstats_level_1.kurt()
+        indicator_info[0,8] = self.rollstats_level_0.kurt()
+        indicator_info[0,9] = self.rollstats_level_1.kurt()
 
-        indicator_info[0,9] = data.ts_event 
-        indicator_info[0,10] = data.open.as_double()
-        indicator_info[0,11] = data.high.as_double() 
-        indicator_info[0,12] = data.low.as_double() 
-        indicator_info[0,13] = data.close.as_double() 
-        indicator_info[0,14] = data.volume.as_double() 
+        indicator_info[0,10] = data.ts_event 
+        indicator_info[0,11] = data.open.as_double()
+        indicator_info[0,12] = data.high.as_double() 
+        indicator_info[0,13] = data.low.as_double() 
+        indicator_info[0,14] = data.close.as_double() 
+        indicator_info[0,15] = data.volume.as_double() 
         # update df 
 
         x= pd.DataFrame(indicator_info,columns=self.columns)

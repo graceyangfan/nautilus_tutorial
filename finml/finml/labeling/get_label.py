@@ -91,7 +91,7 @@ def create_label(
             next_end_idx = zigzags[i+2,"idx"] if i+2 < zigzags.shape[0] else df.shape[0]-1
             for j in range(start_idx,end_idx):
                 if total_returns[j] > 0:
-                    if total_returns[j] > threshold/2.0:# safe 
+                    if total_returns[j] > threshold/4.0:# safe 
                         data_source.append(0)
                         min_acc_arg = np.argmin(close_array[j+1:end_idx+1]) + j+1
                         min_acc = min((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
@@ -108,7 +108,7 @@ def create_label(
                         correct_label.append(min_acc)
                         event_ends.append(original_datetime[min_acc_arg])
                 else:
-                    if total_returns[j] < -threshold/2.0:# safe 
+                    if total_returns[j] < -threshold/4.0:# safe 
                         data_source.append(0)
                         min_acc_arg = np.argmax(close_array[j+1:end_idx+1]) + j+1
                         min_acc = max((close_array[min_acc_arg]-close_array[j])/close_array[j],0)

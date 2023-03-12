@@ -51,7 +51,6 @@ def count_events_per_bar(bar_times, event_times):
 def label_avg_uniqueness(bars, events):
 
     events_counts = count_events_per_bar(bars.select("datetime"), events)
-    events_counts = events_counts.filter(~pl.col("index").is_duplicated())
     events_counts = events_counts.with_column(pl.col("values").fill_null(0))
     res = pl.DataFrame(
         {
@@ -143,8 +142,12 @@ def _get_return_attributions(event_times, events_counts, bars):
     )
     return weights
 
-def compute_weights_by_returns(event_times, events_counts, bars):
-    raw_weights = _get_return_attributions(event_times, events_counts, bars)
+def compute_weights_by_returns(bars_times,event_times):
+
+    events_counts = count_events_per_bar(bars_times.select("datetime"), event_times)
+    events_counts = events_counts.with_column(pl.col("values").fill_null(0))
+
+    raw_weights = _get_return_attributions(event_times, events_counts, bars_times)
     norm_weights = raw_weights.select(
         [pl.col("index"),pl.col("values")/pl.col("values").sum()*raw_weights.shape[0]]
     )

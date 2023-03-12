@@ -1,5 +1,6 @@
 from functools import partial
 from ray import tune
+from ray.air import session
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 from finml.models.gru import GRU 
@@ -42,7 +43,7 @@ def train_gru(
         y_train,
         X_test,
         y_test,
-        tune
+        session
     )
     print(f"the best valid is {best_valid}")
     if save_prefix:

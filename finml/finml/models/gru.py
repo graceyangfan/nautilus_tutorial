@@ -205,7 +205,7 @@ class GRU(Model):
             train_loss, train_score = self.test_epoch(train_loader)
             val_loss, val_score = self.test_epoch(valid_loader)
             print("train score %.6f, valid score %.6f" % (train_score, val_score))
-            if not tune:
+            if tune is not None:
                 tune.report(
                     train_score = train_score,
                     val_score = val_score
@@ -286,6 +286,8 @@ class GRU(Model):
         if os.path.exists(filename_prefix+"_y.pkl"):
             self.y_handler = pickle.load(open(filename_prefix+"_y.pkl", "rb"))
             self.y_handler.fitted  = True 
+        else:
+            self.y_handler = None 
 
         self.fitted = True 
         self.GRU_model.to(self.device)

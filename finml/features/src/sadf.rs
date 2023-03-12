@@ -1,5 +1,6 @@
-use nalgebra::DMatrix;
+use nalgebra::{DMatrix};
 use std::collections::VecDeque;
+
 
 pub fn get_betas(x: &VecDeque<f64>, y: &VecDeque<f64>) -> (f64, f64) {
     let x_matrix = DMatrix::from_row_slice(x.len(), 1, x.as_slices().0);
@@ -16,6 +17,29 @@ pub fn get_betas(x: &VecDeque<f64>, y: &VecDeque<f64>) -> (f64, f64) {
 
     (b_mean[(0, 0)], b_var[(0, 0)])
 }
+
+
+
+pub fn ols_linear_regression(x: &VecDeque<f64>, y: &VecDeque<f64>) -> (f64, f64, f64) {
+    let n = x.len();
+    let x_sum = x.iter().sum::<f64>();
+    let y_sum = y.iter().sum::<f64>();
+    let xy_sum = x.iter().zip(y.iter()).map(|(&x_i, &y_i)| x_i * y_i).sum::<f64>();
+    let x_sq_sum = x.iter().map(|&x_i| x_i * x_i).sum::<f64>();
+
+    let slope = (n as f64 * xy_sum - x_sum * y_sum) / (n as f64 * x_sq_sum - x_sum * x_sum);
+    let intercept = (y_sum - slope * x_sum) / n as f64;
+
+    let y_hat = x.iter().map(|&x_i| slope * x_i + intercept);
+    let residuals = y.iter().zip(y_hat).map(|(&y_i, y_hat_i)| y_i - y_hat_i);
+    let last_residual = residuals.rev().next().unwrap();
+
+    (slope, intercept, last_residual)
+}
+
+
+
+
 
 
 #[cfg(test)]
@@ -40,5 +64,14 @@ mod tests {
 
         assert_abs_diff_eq!(betas,1.98181818,epsilon=1e-6);
         assert_abs_diff_eq!(variances,0.00446281,epsilon=1e-6);
+    }
+    #[test]
+    fn test_ols_linear_regression() {
+        let x: VecDeque<f64> = vec![1.0, 2.0, 3.0, 4.0].into_iter().collect();
+        let y: VecDeque<f64> = vec![2.0, 4.0, 6.0, 8.0].into_iter().collect();
+        let (slope, intercept, residual) = ols_linear_regression(&x, &y);
+        assert_abs_diff_eq!(slope, 2.0, epsilon = 1e-8);
+        assert_abs_diff_eq!(intercept, 0.0, epsilon = 1e-8);
+        assert_abs_diff_eq!(residual, 0.0, epsilon = 1e-8);
     }
 }
