@@ -13,8 +13,6 @@ def agg_timebar(bars,period):
             (pl.col("group_id").shift(1).fill_null(strategy='backward')).alias("group_id")
         ]
     )
-    print(bars["timestamp"])
-    print(bars["group_id"])
     # aggregate bars 
     newbars = bars.groupby("group_id").agg(
         [
