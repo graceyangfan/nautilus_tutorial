@@ -104,7 +104,7 @@ impl MicroStructucture {
             self.volume_imbalance_array.push_back(volume_imbalance);
         }
 
-        if self.close_diff_shift.len() >= self.period{
+        if self.volume_imbalance_array.len() >= self.period{
             self.initialized = true;
         }
         self.pop_front();

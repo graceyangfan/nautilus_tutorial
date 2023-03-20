@@ -53,13 +53,13 @@ def get_ETH_BUSD_instrument(exchange):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--filename', default="../../example_data/ETHBUSD-trades-2023-02-04*.csv")
-    parser.add_argument('--symbol',default='APEBUSD')
+    parser.add_argument('--filename', default="/tmp/OPUSDT*.csv")
+    parser.add_argument('--symbol', default='OPUSDT')
     parser.add_argument("--venue",default='BINANCE') 
     parser.add_argument('--period', type=int, default=10)
     args = parser.parse_args()
 
-    catalog = ParquetDataCatalog("../../catalog/.")
+    catalog = ParquetDataCatalog("../catalog/.")
 
     instrument_id = f"{args.symbol}-PERP.{args.venue}"
     # Get the instrument for the given symbol
@@ -79,7 +79,8 @@ if __name__ == "__main__":
         filenames = sorted(glob.glob(args.filename))
         for file in tqdm(filenames):
             df_in = pl.read_csv(file)
-            df_in.columns = ["trade_id","price","quantity","quoteQty","timestamp","buyer_maker"]
+            df_in.columns = ["trade_id", 'price', 'quantity', 'first_trade_id', 'last_trade_id',
+       "timestamp", "buyer_maker"]
 
             df = pl.concat([df,df_in], how="vertical")
 

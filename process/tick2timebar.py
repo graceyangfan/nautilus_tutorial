@@ -19,7 +19,7 @@ from nautilus_trader.model.enums import BarAggregation
 from nautilus_trader.model.enums import PriceType
 from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
 from nautilus_trader.persistence.external.core import write_objects
-from tests.test_kit.mocks.object_storer import ObjectStorer
+#from tests.test_kit.mocks.object_storer import ObjectStorer
 
 from nautilus_trader.adapters.binance.common.enums import BinanceAccountType
 from nautilus_trader.adapters.binance.factories import get_cached_binance_http_client
@@ -41,13 +41,15 @@ def tick2timebar(
     ):
 
     wrangler = TradeTickDataWrangler(instrument=instrument)
-    ticks = wrangler.process(pd.read_csv(
-            filename,
-            index_col="timestamp",
-            date_parser=_ts_parser,
-            parse_dates=True,
-            nrows=10
-        ))
+    df = pd.read_csv(
+        filename,
+        index_col="timestamp",
+        date_parser=_ts_parser,
+        parse_dates=True,
+        skiprows=1,
+        names=["trade_id","price","quantity","quoteQty","timestamp","buyer_maker"]
+    )
+    ticks = wrangler.process(df)
     clock = TestClock()
     start_time = ticks[0].ts_event
     clock.set_time(start_time)
@@ -70,13 +72,13 @@ def tick2timebar(
             continue  
         for event in events:
             event.handle()
-    print(handler)
+    #print(handler)
     return handler 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--filename',default="processedAPEBUSD-trades-2022-06.csv")
+    parser.add_argument('--filename',default="../example_data/ETHBUSD-trades-2023-02-04.csv")
     parser.add_argument('--symbol',default='APEBUSD')
     parser.add_argument("--venue",default='BINANCE') 
     args = parser.parse_args()

@@ -1,10 +1,12 @@
-use nalgebra::{DMatrix};
+use nalgebra::DMatrix;
 use std::collections::VecDeque;
 
 
 pub fn get_betas(x: &VecDeque<f64>, y: &VecDeque<f64>) -> (f64, f64) {
-    let x_matrix = DMatrix::from_row_slice(x.len(), 1, x.as_slices().0);
-    let y_vector = DMatrix::from_row_slice(y.len(), 1, y.as_slices().0);
+    assert!(x.len() > 0 && y.len() > 0 && x.len() == y.len(),
+     "Input vectors must have equal lengths and at least one element each.");
+    let x_matrix = DMatrix::from_iterator(x.len(), 1, x.iter().cloned());
+    let y_vector = DMatrix::from_iterator(y.len(), 1, y.iter().cloned());
 
     let xy = &x_matrix.transpose() * &y_vector;
     let xx = &x_matrix.transpose() * &x_matrix;
@@ -17,6 +19,7 @@ pub fn get_betas(x: &VecDeque<f64>, y: &VecDeque<f64>) -> (f64, f64) {
 
     (b_mean[(0, 0)], b_var[(0, 0)])
 }
+
 
 
 

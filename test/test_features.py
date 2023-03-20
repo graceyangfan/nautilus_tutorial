@@ -29,9 +29,16 @@ def original_feature(df):
     )
     print(f"the  factor corrections are {corr.label}")
 
-def ms_feature_evaluate(df):
-    for i in range(50,500,50):
-        ms = MicroStructucture(i,1)
+def ms_feature_evaluate(
+    df,
+    columns=["high","low","close","volume"],
+    start_period = 5,
+    end_period = 100,
+    step = 50,
+):
+    results = []
+    for period in np.arange(start_period,end_period,step):
+        ms = MicroStructucture(period,1)
         roll_effective_spread_0 = [] 
         roll_effective_spread_1 = [] 
         high_low_volatility = [] 
@@ -53,7 +60,7 @@ def ms_feature_evaluate(df):
         vpin = [] 
         datetime = [] 
         for j in range(df.shape[0]):
-            ms.update_raw(df[j,"high"],df[j,"low"],df[j,"close"],df[j,"volume"])
+            ms.update_raw(df[j,columns[0]],df[j,columns[1]],df[j,columns[2]],df[j,columns[3]])
             datetime.append(df[j,"datetime"])
             if not ms.initialized():
                 roll_effective_spread_0.append(np.nan)
@@ -98,38 +105,47 @@ def ms_feature_evaluate(df):
                 
         factor = pd.DataFrame({
             "datetime":datetime,
-            "roll_effective_spread_0" : roll_effective_spread_0,
-            "roll_effective_spread_1" : roll_effective_spread_1,
-            "high_low_volatility" : high_low_volatility,
-            "alpha" : alpha,
-            "beta" : beta,
-            "gamma" : gamma,
-            "corwin_schultz_volatility" : corwin_schultz_volatility,
-            "corwin_schultz_spread_0" : corwin_schultz_spread_0,
-            "corwin_schultz_spread_1" : corwin_schultz_spread_1,
-            "bar_based_kyle_lambda" : bar_based_kyle_lambda,
-            "bar_based_amihud_lambda" : bar_based_amihud_lambda,
-            "bar_based_hasbrouck_lambda" : bar_based_hasbrouck_lambda,
-            "trade_based_kyle_lambda_0":trade_based_kyle_lambda_0,
-            "trade_based_amihud_lambda_0":trade_based_amihud_lambda_0,
-            "trade_based_hasbrouck_lambda_0":trade_based_hasbrouck_lambda_0,
-            "trade_based_kyle_lambda_1":trade_based_kyle_lambda_1,
-            "trade_based_amihud_lambda_1":trade_based_amihud_lambda_1,
-            "trade_based_hasbrouck_lambda_1":trade_based_hasbrouck_lambda_1,
-            "vpin" : vpin
+            f"{period}_roll_effective_spread_0" : roll_effective_spread_0,
+            f"{period}_roll_effective_spread_1" : roll_effective_spread_1,
+            f"{period}_high_low_volatility" : high_low_volatility,
+            f"{period}_alpha" : alpha,
+            f"{period}_beta" : beta,
+            f"{period}_gamma" : gamma,
+            f"{period}_corwin_schultz_volatility" : corwin_schultz_volatility,
+            f"{period}_corwin_schultz_spread_0" : corwin_schultz_spread_0,
+            f"{period}_corwin_schultz_spread_1" : corwin_schultz_spread_1,
+            f"{period}_bar_based_kyle_lambda" : bar_based_kyle_lambda,
+            f"{period}_bar_based_amihud_lambda" : bar_based_amihud_lambda,
+            f"{period}_bar_based_hasbrouck_lambda" : bar_based_hasbrouck_lambda,
+            f"{period}_trade_based_kyle_lambda_0":trade_based_kyle_lambda_0,
+            f"{period}_trade_based_amihud_lambda_0":trade_based_amihud_lambda_0,
+            f"{period}_trade_based_hasbrouck_lambda_0":trade_based_hasbrouck_lambda_0,
+            f"{period}_trade_based_kyle_lambda_1":trade_based_kyle_lambda_1,
+            f"{period}_trade_based_amihud_lambda_1":trade_based_amihud_lambda_1,
+            f"{period}_trade_based_hasbrouck_lambda_1":trade_based_hasbrouck_lambda_1,
+            f"{period}_vpin" : vpin
         })
         label = df.select([pl.col('datetime'),pl.col("label")])
         corr = corrections(
             factor,
             label,
-            corr_type ="pearson",
+            corr_type ="spearman",
         )
-        print(f"the period {i} factor corrections are {corr.label}")
+        print(f"the period {period} factor corrections are {corr.label}")
+        results.append(corr)
+    return pd.concat(results,axis=0)
 
 
-def test_entropy(df):
+def test_entropy(
+    df,
+    col,
+    start_period,
+    end_period,
+    step,
+):
     label = df.select([pl.col('datetime'),pl.col("label")])
-    for period in range(50,500,50):
+    results = []
+    for period in range(start_period,end_period,step):
         en = Entropy(period,10,-0.05,0.05)
         shannon_entropy = [] 
         plugin_entropy = [] 
@@ -148,19 +164,24 @@ def test_entropy(df):
                 konto_entropy.append(en.konto_entropy(0))
         factor = pd.DataFrame({
             "datetime":datetime,
-            "shannon_entropy" : shannon_entropy,
-            "plugin_entropy" : plugin_entropy,
-            "konto_entropy" : konto_entropy,
+            f"{period}shannon_entropy" : shannon_entropy,
+            f"{period}plugin_entropy" : plugin_entropy,
+            f"{period}konto_entropy" : konto_entropy,
         })
         corr = corrections(
             factor,
             label,
-            corr_type ="pearson",
+            corr_type ="spearman",
         )
         print(f"the period {period} factor corrections are {corr.label}")
+        results.append(corr)
+    return pd.concat(results,axis=0)
 
 
-def test_diff(df,col):
+def test_diff(
+    df,
+    col
+):
     label = df.select([pl.col('datetime'),pl.col("label")])
     for order in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]:
         for period in range(50,500,50):
@@ -479,32 +500,40 @@ def test_vidya(df):
 
 
 from nautilus_trader.indicators.zscore import Zscore
-def test_zscore(df,col):
-    label = df.select([pl.col('datetime'),pl.col("label")])
-    for period in range(50,500,50):
+def zscore_analysis(
+    _df,
+    col,
+    start_period = 6,
+    end_period = 300,
+    step = 30,
+):
+    results = []
+    label = _df.select([pl.col('datetime'),pl.col("label")])
+    for period in range(start_period,end_period,step):
         zscore = Zscore(period)
         datetime = [] 
         zscore_list = [] 
     
-        for j in range(df.shape[0]):
-            zscore.update_raw(df[j,col])
-            datetime.append(df[j,"datetime"])
+        for j in range(_df.shape[0]):
+            zscore.update_raw(_df[j,col])
+            datetime.append(_df[j,"datetime"])
             if not zscore.initialized:
                 zscore_list.append(np.nan)
             else:
                 zscore_list.append(zscore.value)
         factor = pd.DataFrame({
             "datetime":datetime,
-            "zscore" : zscore_list,
+            f"zscore_{period}" : zscore_list,
         })
-        label = df.select([pl.col('datetime'),pl.col("label")])
+        label = _df.select([pl.col('datetime'),pl.col("label")])
         corr = corrections(
             factor,
             label,
-            corr_type ="pearson",
+            corr_type ="spearman",
         )
         print(f"the period {period} factor corrections are {corr}")
-
+        results.append(corr) 
+    return pd.concat(results,axis=0)
 
 
 from nautilus_trader.indicators.rvi import RelativeVolatilityIndex
@@ -646,8 +675,8 @@ from nautilus_trader.indicators.zigzag import Zigzag
 import pandas as pd 
 def test_zigzag(df):
     label = df.select([pl.col('datetime'),pl.col("label")])
-    for change_percent in range(0.005,0.05,0.005):
-        zigzag =Zigzag(change_percent)
+    for change_percent in np.arange(0.005,0.05,0.005):
+        zigzag =Zigzag(change_percent,False)
         datetime = [] 
         zigzag_value_list = [] 
         zigzag_strength_list = []   
@@ -655,7 +684,7 @@ def test_zigzag(df):
         zizag_last_anchored_vwap_list = [] 
         zigzag_volume_ratio_list = [] 
         for j in range(df.shape[0]):
-            zigzag.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"],df[j,"volume"],pd.Timestamp(df[j,ts_event], tz="UTC"))
+            zigzag.update_raw(df[j,"open"],df[j,"high"],df[j,"low"],df[j,"close"],df[j,"volume"],pd.Timestamp(df[j,"datetime"], tz="UTC"))
             datetime.append(df[j,"datetime"])
             if not zigzag.initialized:
                 zigzag_value_list.append(np.nan)
@@ -670,9 +699,9 @@ def test_zigzag(df):
                 else:
                     zigzag_value_list.append((-zigzag.low_price+df[j,"close"])/zigzag.length)
                     zigzag_strength_list.append(zigzag.zigzag_direction*zigzag.length/zigzag.high_price)
-                zizag_anchored_vwap_list.append(df[j,"close"]/zigzag.zigzag_anchored_vwap)
-                zizag_last_anchored_vwap_list.append(df[j,"close"]/zigzag.last_zigzag_anchored_vwap)
-                zigzag_volume_ratio_list.append(df[j,"volume"]/zigzag.last_sum_volume/zigzag.last_anchored_bars)
+                zizag_anchored_vwap_list.append(zigzag.anchored_vwap)
+                zizag_last_anchored_vwap_list.append(zigzag.last_anchored_vwap)
+                zigzag_volume_ratio_list.append(zigzag.last_sum_volume)
 
         factor = pd.DataFrame({
             "datetime":datetime,

@@ -15,7 +15,7 @@ def corrections(
     factor:pd.DataFrame,
     label:pd.DataFrame,
     drop_feature_corr_threshold = 0.7,
-    corr_type: str ="pearson",
+    corr_type: str ="spearman",
 ):
     '''
     corr_type: {‘pearson’, ‘kendall’, ‘spearman’} or callable

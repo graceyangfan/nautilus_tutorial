@@ -29,6 +29,7 @@ def cusum_filter(bars, threshold):
         elif s_pos > threshold:
             s_pos = 0
             events_indexs.append(index)
+    events_indexs = [item - bars[0,"count_index"] for item in events_indexs]
     return events_indexs
 
 
