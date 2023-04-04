@@ -75,17 +75,28 @@ impl OrderBlockDetecter {
         ts_event: u64,
     )
     {   
+        let mut h = high;
+        let mut l = low;
+        let mut hl = (h + l)/2.0;
+        if self.volume_array.len() >= 2*self.period + 1
+        {
+            self.initialized = true;
+            h = self.high_array[0];
+            l = self.low_array[0];
+            hl = (h + l)/2.0;
+        }
+        self.pop_front();
+
         self.high_array.push_back(high);
         self.low_array.push_back(low);
         self.close_array.push_back(close);
         self.volume_array.push_back(volume);
+
+
         let upper = self.high_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
         let lower = self.low_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
         let target_bull = self.close_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
         let target_bear = self.close_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-        let h = self.high_array[self.high_array.len()-1];
-        let l = self.low_array[self.low_array.len()-1];
-        let hl = (h + l)/2.0;
 
         if h > upper
         {
@@ -102,7 +113,7 @@ impl OrderBlockDetecter {
         let max_volume = self.volume_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
         let phv = self.volume_array[(self.volume_array.len()-1)/2] / max_volume > 1.0 - self.delta_pct;
 
-        if phv && self.os == 1 
+        if phv && self.os == 1 && self.initialized
         {
             self.bull_blocks.push_back(
                     OrderBlock{
@@ -115,7 +126,7 @@ impl OrderBlockDetecter {
             )
         }
 
-        if phv && self.os == 0
+        if phv && self.os == 0 && self.initialized
         {
             self.bear_blocks.push_back(
                     OrderBlock{
@@ -129,7 +140,7 @@ impl OrderBlockDetecter {
         }
         
         // remove mitigated block 
-        for i in 0..self.bull_blocks.len()
+        for i in (0..self.bull_blocks.len()).rev()
         {
             if remove_mitigated(&self.bull_blocks[i], target_bull)
             {
@@ -137,19 +148,13 @@ impl OrderBlockDetecter {
             }
         }
        
-        for i in 0..self.bear_blocks.len()
+        for i in (0..self.bear_blocks.len()).rev()
         {
             if remove_mitigated(&self.bear_blocks[i], target_bear)
             {
                 self.bear_blocks.remove(i);
             }
         }
-
-        if self.volume_array.len() >= 2*self.period + 1
-        {
-            self.initialized = true;
-        }
-        self.pop_front();
     }
 
     pub fn pop_front(&mut self)
@@ -184,7 +189,7 @@ impl OrderBlockDetecter {
 
     pub fn get_bull_block(&self, idx: usize) -> (f64, f64, f64, u64)
     {
-        if idx >= self.bull_blocks_num() - 1 
+        if idx > self.bull_blocks_num() - 1 
         {
             return (0.0, 0.0, 0.0, 0);
         }
@@ -194,7 +199,7 @@ impl OrderBlockDetecter {
 
     pub fn get_bear_block(&self, idx: usize) -> (f64, f64, f64, u64)
     {
-        if idx >= self.bear_blocks_num() - 1 
+        if idx > self.bear_blocks_num() - 1 
         {
             return (0.0, 0.0, 0.0, 0);
         }
