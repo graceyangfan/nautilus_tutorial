@@ -134,7 +134,7 @@ def create_label(
     df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"]))
 
     df = df.select(pl.all().exclude(['value', 'type', 'idx', 'prevext']))
-    df = df.with_column( pl.col("datetime").alias("event_starts"))
+    df = df.with_columns( [pl.col("datetime").alias("event_starts")])
     if cut_label:
         label_array = df[:,"label"].to_numpy()
         df = df.select([

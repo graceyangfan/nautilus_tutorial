@@ -10,7 +10,11 @@ def drop_rare_labels(events, min_pct=0.05, min_classes=2):
     """
     while True:
         counts = events["label"].value_counts()
-        counts = counts.with_column((pl.col("label")/pl.col("label").sum()).alias("rate"))
+        counts = counts.with_columns(
+            [
+                (pl.col("label")/pl.col("label").sum()).alias("rate")
+            ]
+        )
         if counts["rate"].min() > min_pct or counts.shape[0] <= min_classes:
             break
         events = events.filter(
@@ -22,8 +26,10 @@ def drop_rare_labels(events, min_pct=0.05, min_classes=2):
 def count_events_per_bar(bar_times, event_times):
 
 
-    event_times = event_times.with_column(
-        pl.col("event_ends").fill_null(event_times[-1,"event_ends"])
+    event_times = event_times.with_columns(
+        [
+            pl.col("event_ends").fill_null(event_times[-1,"event_ends"])
+        ]
     )
     event_times_iloc1 = bar_times.select(
         pl.col("datetime").search_sorted(event_times[0,"event_starts"])
@@ -39,11 +45,13 @@ def count_events_per_bar(bar_times, event_times):
     )
     event_times = event_times.select([pl.col("event_starts"),pl.col("event_ends")])
     for event_starts,event_ends in event_times.iter_rows():
-        res = res.with_column(
-            pl.when((pl.col("index") >= event_starts) & (pl.col("index") <= event_ends))
-            .then(pl.col("values")+1)
-            .otherwise(pl.col("values"))
-            .alias("values")
+        res = res.with_columns(
+            [
+                pl.when((pl.col("index") >= event_starts) & (pl.col("index") <= event_ends))
+                .then(pl.col("values")+1)
+                .otherwise(pl.col("values"))
+                .alias("values")
+            ]
         )
     return res
 
@@ -51,7 +59,11 @@ def count_events_per_bar(bar_times, event_times):
 def label_avg_uniqueness(bars, events):
 
     events_counts = count_events_per_bar(bars.select("datetime"), events)
-    events_counts = events_counts.with_column(pl.col("values").fill_null(0))
+    events_counts = events_counts.with_columns(
+        [
+            pl.col("values").fill_null(0)
+        ]
+    )
     res = pl.DataFrame(
         {
             "index":events.select("event_starts").to_numpy().flatten(),
@@ -61,11 +73,13 @@ def label_avg_uniqueness(bars, events):
     events = events.select([pl.col("event_starts"),pl.col("event_ends")])
     for event_starts,event_ends in events.iter_rows():
         res = res.with_column(
-            pl.when((pl.col("index") == event_starts))
-            .then((1.0 / events_counts.filter((pl.col("index")>= event_starts)&(pl.col("index")<=event_ends))["values"]).mean())
-            .otherwise(pl.col("values"))
-            .alias("values")
-            )
+            [
+                pl.when((pl.col("index") == event_starts))
+                .then((1.0 / events_counts.filter((pl.col("index")>= event_starts)&(pl.col("index")<=event_ends))["values"]).mean())
+                .otherwise(pl.col("values"))
+                .alias("values")
+            ]
+        )
     return res
 
 
@@ -133,9 +147,11 @@ def _get_return_attributions(event_times, events_counts, bars):
         )["values"] / events_counts.filter(
             (pl.col("index")>=event_starts) & (pl.col("index")<=event_ends) 
         )["values"]
-        weights = weights.with_column(
-            pl.when(pl.col("index") == event_starts)
-            .then(return_attributed.sum()).otherwise(pl.col("values")).alias("values")
+        weights = weights.with_columns(
+            [
+                pl.when(pl.col("index") == event_starts)
+                .then(return_attributed.sum()).otherwise(pl.col("values")).alias("values")
+            ]
         )
     weights = weights.select(
         [pl.col("index"),pl.col("values").abs()]
@@ -145,7 +161,11 @@ def _get_return_attributions(event_times, events_counts, bars):
 def compute_weights_by_returns(bars_times,event_times):
 
     events_counts = count_events_per_bar(bars_times.select("datetime"), event_times)
-    events_counts = events_counts.with_column(pl.col("values").fill_null(0))
+    events_counts = events_counts.with_columns(
+        [
+            pl.col("values").fill_null(0)
+        ]
+    )
 
     raw_weights = _get_return_attributions(event_times, events_counts, bars_times)
     norm_weights = raw_weights.select(

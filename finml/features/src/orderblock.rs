@@ -43,6 +43,10 @@ pub struct OrderBlockDetecter {
     block_nums: usize,
     delta_pct: f64,
     os: usize,
+    bull_block_removed: bool,
+    bear_block_removed: bool,
+    bull_block_added: bool,
+    bear_block_added: bool,
     initialized: bool,
 }
 
@@ -62,6 +66,10 @@ impl OrderBlockDetecter {
                 block_nums: block_nums,
                 delta_pct: delta_pct,
                 os: 0,
+                bull_block_removed: false,
+                bear_block_removed: false,
+                bull_block_added: false,
+                bear_block_added: false,
                 initialized: false,
         }
     }
@@ -75,6 +83,7 @@ impl OrderBlockDetecter {
         ts_event: u64,
     )
     {   
+        
         let mut h = high;
         let mut l = low;
         let mut hl = (h + l)/2.0;
@@ -113,6 +122,31 @@ impl OrderBlockDetecter {
         let max_volume = self.volume_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
         let phv = self.volume_array[(self.volume_array.len()-1)/2] / max_volume > 1.0 - self.delta_pct;
 
+
+        self.bull_block_removed = false;
+        self.bear_block_removed = false;
+        self.bull_block_added = false;
+        self.bear_block_added = false;
+        // remove mitigated block 
+        for i in (0..self.bull_blocks.len()).rev()
+        {
+            if remove_mitigated(&self.bull_blocks[i], target_bull)
+            {
+                self.bull_blocks.remove(i);
+                self.bull_block_removed = true;
+            }
+        }
+       
+        for i in (0..self.bear_blocks.len()).rev()
+        {
+            if remove_mitigated(&self.bear_blocks[i], target_bear)
+            {
+                self.bear_blocks.remove(i);
+                self.bear_block_removed = true;
+            }
+        }
+
+
         if phv && self.os == 1 && self.initialized
         {
             self.bull_blocks.push_back(
@@ -123,7 +157,8 @@ impl OrderBlockDetecter {
                         value: l,
                         ts_event: ts_event,
                     }
-            )
+            );
+            self.bull_block_added = true;
         }
 
         if phv && self.os == 0 && self.initialized
@@ -136,25 +171,10 @@ impl OrderBlockDetecter {
                         value: h,
                         ts_event: ts_event,
                     }
-            )
+            );
+            self.bear_block_added = true;
         }
         
-        // remove mitigated block 
-        for i in (0..self.bull_blocks.len()).rev()
-        {
-            if remove_mitigated(&self.bull_blocks[i], target_bull)
-            {
-                self.bull_blocks.remove(i);
-            }
-        }
-       
-        for i in (0..self.bear_blocks.len()).rev()
-        {
-            if remove_mitigated(&self.bear_blocks[i], target_bear)
-            {
-                self.bear_blocks.remove(i);
-            }
-        }
     }
 
     pub fn pop_front(&mut self)
@@ -177,6 +197,26 @@ impl OrderBlockDetecter {
         {
             self.bear_blocks.pop_front();
         }
+    }
+
+    pub fn bull_block_added(&self) -> bool 
+    {
+        self.bull_block_added
+    }
+
+    pub fn bear_block_added(&self) -> bool 
+    {
+        self.bear_block_added
+    }
+
+    pub fn bull_block_removed(&self) -> bool 
+    {
+        self.bull_block_removed
+    }
+
+    pub fn bear_block_removed(&self) -> bool 
+    {
+        self.bear_block_removed 
     }
 
     pub fn bull_blocks_num(&self) -> usize {
