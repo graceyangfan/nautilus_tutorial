@@ -1,4 +1,3 @@
-
 use pyo3::prelude::*;
 extern crate nalgebra;
 use nalgebra::SMatrix;
@@ -34,7 +33,7 @@ impl KalmanFilter {
         //forward
         let f = SMatrix::<f64, 2, 2>::identity();
         let x_pred = f * self.state_mean; //2*2*2*1 = (2,1)
-        let p_pred = f * self.p * f.transpose() + self.q*SMatrix::<f64, 2, 2>::identity(); // Covariance prediction
+        let p_pred = (f * self.p * f.transpose()).add_scalar(self.q);
         // Correct
         let h = SMatrix::<f64, 1, 2>::from_vec(vec![input_x,1.]);
         let y = (-h*x_pred).add_scalar(input_y);// Innovation
