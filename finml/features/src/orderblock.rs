@@ -2,27 +2,40 @@ use pyo3::prelude::*;
 use std::collections::VecDeque;
 
 #[derive(Debug,Clone)]
-pub struct OrderBlock
+pub struct FVG 
 {
     pub is_bull: bool,
+    pub mitigated_times: usize,
     pub top: f64,
     pub bottom: f64,
     pub value: f64,
     pub ts_event: u64,
 }
 
-pub fn remove_mitigated(block: &OrderBlock, target: f64) -> bool 
+
+#[derive(Debug,Clone)]
+pub struct OrderBlock
+{
+    pub is_bull: bool,
+    pub mitigated_times: usize,
+    pub top: f64,
+    pub bottom: f64,
+    pub value: f64,
+    pub ts_event: u64,
+}
+
+pub fn check_mitigated(block: &OrderBlock, last_target: f64, current_target: f64) -> bool 
 {
     if block.is_bull 
     {
-        if target < block.bottom
+        if current_target < block.bottom && block.bottom < last_target
         {
             return true;
         }
     }
     else
     {
-        if target > block.top
+        if current_target > block.top && block.top > last_target
         {
             return true;
         }
@@ -30,46 +43,56 @@ pub fn remove_mitigated(block: &OrderBlock, target: f64) -> bool
     false
 }
 
+pub fn check_mitigated_for_fvg(fvg:&FVG, last_target: f64, current_target: f64) -> bool 
+{
+    if fvg.is_bull 
+    {
+        if current_target < fvg.bottom && fvg.bottom < last_target
+        {
+            return true;
+        }
+    }
+    else
+    {
+        if current_target > fvg.top && fvg.top > last_target
+        {
+            return true;
+        }
+    }
+    false
+}
+
+
 #[pyclass]
 #[derive(Debug)]
-pub struct OrderBlockDetecter {
+pub struct OrderBlockDetector {
     high_array:VecDeque<f64>,
     low_array:VecDeque<f64>,
     close_array: VecDeque<f64>,
-    volume_array: VecDeque<f64>,
-    bull_blocks: VecDeque<OrderBlock>,
-    bear_blocks: VecDeque<OrderBlock>,
+    ts_event_array: VecDeque<u64>,
+    blocks: VecDeque<OrderBlock>,
+    fvgs: VecDeque<FVG>,
     period: usize,
+    order: usize,
     block_nums: usize,
-    delta_pct: f64,
-    os: usize,
-    bull_block_removed: bool,
-    bear_block_removed: bool,
-    bull_block_added: bool,
-    bear_block_added: bool,
     initialized: bool,
 }
 
 #[pymethods]
-impl OrderBlockDetecter {
+impl OrderBlockDetector {
     #[new]
     #[args(block_nums = "1")]
-    pub fn new(period: usize, delta_pct: f64, block_nums: usize) -> Self {
+    pub fn new(period: usize, order: usize, block_nums: usize) -> Self {
         Self {
                 high_array: VecDeque::with_capacity(period),
                 low_array: VecDeque::with_capacity(period),
                 close_array: VecDeque::with_capacity(period),
-                volume_array: VecDeque::with_capacity(2*period+1),
-                bull_blocks: VecDeque::with_capacity(block_nums),
-                bear_blocks: VecDeque::with_capacity(block_nums),
+                ts_event_array: VecDeque::with_capacity(period),
+                blocks: VecDeque::with_capacity(block_nums),
+                fvgs:VecDeque::with_capacity(block_nums),
                 period: period,
+                order: order,
                 block_nums: block_nums,
-                delta_pct: delta_pct,
-                os: 0,
-                bull_block_removed: false,
-                bear_block_removed: false,
-                bull_block_added: false,
-                bear_block_added: false,
                 initialized: false,
         }
     }
@@ -79,102 +102,130 @@ impl OrderBlockDetecter {
         high: f64,
         low: f64,
         close: f64,
-        volume: f64,
         ts_event: u64,
     )
     {   
-        
-        let mut h = high;
-        let mut l = low;
-        let mut hl = (h + l)/2.0;
-        if self.volume_array.len() >= 2*self.period + 1
-        {
-            self.initialized = true;
-            h = self.high_array[0];
-            l = self.low_array[0];
-            hl = (h + l)/2.0;
-        }
-        self.pop_front();
-
         self.high_array.push_back(high);
         self.low_array.push_back(low);
         self.close_array.push_back(close);
-        self.volume_array.push_back(volume);
-
-
-        let upper = self.high_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-        let lower = self.low_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-        let target_bull = self.close_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-        let target_bear = self.close_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-
-        if h > upper
+        self.ts_event_array.push_back(ts_event);
+        if self.high_array.len() >= self.period
         {
-            self.os = 0;
+            self.initialized = true;
         }
-        else
+        self.pop_front();
+
+        if self.high_array.len() >= 2*self.order + 1
         {
-            if l < lower
+            let high_values = self.high_array.range(self.high_array.len()-2*self.order-1..self.high_array.len()).copied().collect::<Vec<_>>();
+            let low_values = self.low_array.range(self.low_array.len()-2*self.order-1..self.low_array.len()).copied().collect::<Vec<_>>();
+            let max_high_idx =  high_values.iter().enumerate().max_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();
+            let min_low_idx = low_values.iter().enumerate().min_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();            
+            let h = high_values[self.order];
+            let l = low_values[self.order];
+            if max_high_idx  == self.order
             {
-                self.os = 1;
-            }
-        }
-        
-        let max_volume = self.volume_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
-        let phv = self.volume_array[(self.volume_array.len()-1)/2] / max_volume > 1.0 - self.delta_pct;
-
-
-        self.bull_block_removed = false;
-        self.bear_block_removed = false;
-        self.bull_block_added = false;
-        self.bear_block_added = false;
-        // remove mitigated block 
-        for i in (0..self.bull_blocks.len()).rev()
-        {
-            if remove_mitigated(&self.bull_blocks[i], target_bull)
-            {
-                self.bull_blocks.remove(i);
-                self.bull_block_removed = true;
-            }
-        }
-       
-        for i in (0..self.bear_blocks.len()).rev()
-        {
-            if remove_mitigated(&self.bear_blocks[i], target_bear)
-            {
-                self.bear_blocks.remove(i);
-                self.bear_block_removed = true;
-            }
-        }
-
-
-        if phv && self.os == 1 && self.initialized
-        {
-            self.bull_blocks.push_back(
-                    OrderBlock{
-                        is_bull: true,
-                        top: hl,
-                        bottom: l,
-                        value: l,
-                        ts_event: ts_event,
-                    }
-            );
-            self.bull_block_added = true;
-        }
-
-        if phv && self.os == 0 && self.initialized
-        {
-            self.bear_blocks.push_back(
+                self.blocks.push_back(
                     OrderBlock{
                         is_bull: false,
+                        mitigated_times: 0,
                         top: h,
-                        bottom: hl,
-                        value: h,
+                        bottom: l,
+                        value: self.close_array[self.close_array.len()-1-self.order],
+                        ts_event: self.ts_event_array[self.ts_event_array.len()-1-self.order]
+                    }
+                );
+            }
+            
+            if min_low_idx == self.order
+            {
+                self.blocks.push_back(
+                    OrderBlock{
+                        is_bull: true,
+                        mitigated_times: 0,
+                        top: h,
+                        bottom: l,
+                        value: self.close_array[self.close_array.len()-1-self.order],
+                        ts_event: self.ts_event_array[self.ts_event_array.len()-1-self.order]
+                    }
+                )
+            }
+            //push fvg 
+            let h2 = self.high_array[self.high_array.len() -1-2];
+            let h0 = self.high_array[self.high_array.len() -1];
+            let l2 = self.low_array[self.low_array.len() -1-2];
+            let l0 = self.low_array[self.low_array.len() -1];
+            let c2 = self.close_array[self.close_array.len() -1-2];
+            let c1 = self.close_array[self.close_array.len() -1-1];
+            let bull_fvg_condition = l0 > h2 && c1 > c2 && c1 > h2;
+            let bear_fvg_condition = h0 < l2 && c1 < c2 && c1 < l2;
+
+            if bull_fvg_condition
+            {
+                self.fvgs.push_back(
+                    FVG{
+                        is_bull: true,
+                        mitigated_times: 0,
+                        top: l0,
+                        bottom: h2,
+                        value: (l0+h2)/2.0,
                         ts_event: ts_event,
                     }
-            );
-            self.bear_block_added = true;
+                );
+            }
+            if bear_fvg_condition
+            {
+                self.fvgs.push_back(
+                    FVG{
+                        is_bull: false,
+                        mitigated_times: 0,
+                        top: l2,
+                        bottom: h0,
+                        value: (l2+h0)/2.0,
+                        ts_event: ts_event,
+                    }
+                );
+            }
         }
-        
+
+        // mitigated block 
+        for i in (0..self.blocks.len()).rev()
+        {
+            if self.blocks[i].is_bull 
+            {
+                if  self.close_array.len()>=2 && check_mitigated(&self.blocks[i], self.close_array[self.close_array.len()-2], close)
+                {
+                    self.blocks[i].mitigated_times += 1;
+                }
+            }
+            else
+            {
+                if  self.close_array.len()>=2 && check_mitigated(&self.blocks[i], self.close_array[self.close_array.len()-2], close)
+                {
+                    self.blocks[i].mitigated_times += 1;
+                }
+            }
+        }
+
+        // check_migated for fvg 
+        for i in (0..self.fvgs.len()).rev()
+        {
+            if self.fvgs[i].is_bull 
+            {
+                if  self.close_array.len()>=2 && check_mitigated_for_fvg(&self.fvgs[i], self.close_array[self.close_array.len()-2], close)
+                {
+                    self.fvgs[i].mitigated_times += 1;
+                }
+            }
+            else
+            {
+                if  self.close_array.len()>=2 && check_mitigated_for_fvg(&self.fvgs[i], self.close_array[self.close_array.len()-2], close)
+                {
+                    self.fvgs[i].mitigated_times += 1;
+                }
+            }
+        }
+
     }
 
     pub fn pop_front(&mut self)
@@ -184,69 +235,48 @@ impl OrderBlockDetecter {
             self.high_array.pop_front();
             self.low_array.pop_front();
             self.close_array.pop_front();
+            self.ts_event_array.pop_front();
         }
-        if self.volume_array.len() >= 2 * self.period + 2 
+        if self.blocks.len() >= self.block_nums + 1
         {
-            self.volume_array.pop_front();
-        }
-        if self.bull_blocks.len() >= self.block_nums + 1
+            self.blocks.pop_front();
+        } 
+        if self.fvgs.len() >=self.block_nums + 1
         {
-            self.bull_blocks.pop_front();
+            self.fvgs.pop_front();
         }
-        if self.bear_blocks.len() >= self.block_nums + 1 
+    }
+
+
+    pub fn block_nums(&self) -> usize
+    {
+        self.blocks.len()
+    }
+
+    pub fn fvg_nums(&self) ->usize
+    {
+        self.fvgs.len()
+    }
+    
+    pub fn get_block(&self, idx: usize) -> (bool,usize,f64,f64,f64)
+    {
+        if idx > self.blocks.len() - 1 
         {
-            self.bear_blocks.pop_front();
+            return (false, 0, 0.0, 0.0, 0.0);
         }
+        let block = &self.blocks[self.blocks.len()-1-idx];
+        (block.is_bull, block.mitigated_times, block.top, block.bottom, block.value)
     }
 
-    pub fn bull_block_added(&self) -> bool 
+    pub fn get_fvg(&self, idx: usize) -> (bool,usize,f64,f64,f64)
     {
-        self.bull_block_added
-    }
-
-    pub fn bear_block_added(&self) -> bool 
-    {
-        self.bear_block_added
-    }
-
-    pub fn bull_block_removed(&self) -> bool 
-    {
-        self.bull_block_removed
-    }
-
-    pub fn bear_block_removed(&self) -> bool 
-    {
-        self.bear_block_removed 
-    }
-
-    pub fn bull_blocks_num(&self) -> usize {
-        self.bull_blocks.len()
-    }
-
-    pub fn bear_blocks_num(&self) -> usize {
-        self.bear_blocks.len()
-    }
-
-    pub fn get_bull_block(&self, idx: usize) -> (f64, f64, f64, u64)
-    {
-        if idx > self.bull_blocks_num() - 1 
+        if idx > self.fvgs.len() - 1
         {
-            return (0.0, 0.0, 0.0, 0);
+            return (false, 0, 0.0, 0.0, 0.0);
         }
-        let block = &self.bull_blocks[self.bull_blocks.len()-1-idx];
-        (block.top, block.bottom, block.value, block.ts_event)
+        let fvg = &self.fvgs[self.fvgs.len()-1-idx];
+        (fvg.is_bull, fvg.mitigated_times, fvg.top, fvg.bottom, fvg.value)
     }
-
-    pub fn get_bear_block(&self, idx: usize) -> (f64, f64, f64, u64)
-    {
-        if idx > self.bear_blocks_num() - 1 
-        {
-            return (0.0, 0.0, 0.0, 0);
-        }
-        let block = &self.bear_blocks[self.bear_blocks.len()-1-idx];
-        (block.top, block.bottom, block.value, block.ts_event)
-    }
-
     
     pub fn reset(&mut self) {
         self.initialized = false;
@@ -255,7 +285,6 @@ impl OrderBlockDetecter {
     pub fn initialized(&self) -> bool {
         self.initialized
     }
-
 }
 
 
@@ -267,9 +296,9 @@ mod tests {
     #[test]
     fn test_orderblock_detect()
     {
-        // create an instance of OrderBlockDetecter with period = 5, delta_pct = 0.01 and block_nums = 1
-        let mut detecter =  OrderBlockDetecter::new(5, 0.01, 1);
-        // use some sample data for high, low, close, volume and timestamp
+        // create an instance of OrderBlockDetector with period = 5, threshold = 0.01 and block_nums = 1
+        let mut detecter =  OrderBlockDetector::new(5, 0.01, 1);
+        // use some sample data for high, low, close, volume and ts_event
         let high = vec![10000.0, 10100.0, 10200.0, 10300.0, 10400.0, 10350.0];
         let low = vec![9900.0, 10000.0, 10100.0, 10200.0, 10300.0, 10250.0];
         let close = vec![10000.0, 10100.0, 10200.0, 10300.0, 10400.0, 10300.0];

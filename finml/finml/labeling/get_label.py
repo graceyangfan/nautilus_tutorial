@@ -9,9 +9,19 @@ def calc_change_since_pivot(current,last_pivot):
     return perc_change_since_pivot
 
 def get_zigzag(idx, row, taip=None):
+    '''
+    item:datetime,close,high,low
+    '''
+    if (taip == "Peak"):
+        key = 2
+    elif (taip == "Trough"):
+        key = 3
+    else:
+        key = 1
+
     return {
         "datetime": row[0],
-        "value": row[1],
+        "value": row[key],
         "type": taip,
         "idx":idx,
     }
@@ -24,7 +34,7 @@ def create_label(
     log_return = True,
 ):
     zigzags = []
-    for idx,item in enumerate(df.select(["datetime","close"]).iter_rows()):
+    for idx,item in enumerate(df.select(["datetime","close","high","low"]).iter_rows()):
         is_starting = (idx == 0)
         if is_starting:
             zigzags.append(get_zigzag(idx,item))

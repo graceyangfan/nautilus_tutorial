@@ -58,7 +58,7 @@ def hyper_opt_classifier(
     sample_weight_eval_set = None,
     early_stopping_rounds=20, 
     callbacks=None,
-    verbose_eval = 100,
+    verbose_eval = 1000,
     max_minutes=10, 
     n_trials = None, 
     study_name = "XGBoostLSS-HyperOpt", 
@@ -72,11 +72,13 @@ def hyper_opt_classifier(
             "objective": object_func,
             "learning_rate": trial.suggest_float("learning_rate", params["learning_rate"][0], params["learning_rate"][1],log = True),
             "eta": trial.suggest_float("eta", params["eta"][0], params["eta"][1],log = True),
+            "n_estimators": trial.suggest_int("n_estimators", params["n_estimators"][0], params["n_estimators"][1]),
             "max_depth": trial.suggest_int("max_depth", params["max_depth"][0], params["max_depth"][1]),
             "gamma": trial.suggest_float("gamma", params["gamma"][0], params["gamma"][1],log = True),
             "subsample": trial.suggest_float("subsample", params["subsample"][0], params["subsample"][1],log = True),
             "colsample_bytree": trial.suggest_float("colsample_bytree", params["colsample_bytree"][0], params["colsample_bytree"][1],log = True),
-            "min_child_weight": trial.suggest_int("min_child_weight", params["min_child_weight"][0], params["min_child_weight"][1])
+            "min_child_weight": trial.suggest_int("min_child_weight", params["min_child_weight"][0], params["min_child_weight"][1]),
+           # "num_boost_round":1000,
         }
         if  num_class > 2:
             hyper_params.update({"num_class": num_class})
@@ -146,7 +148,8 @@ def fit_xgboost(
     # Specifies the parameters and their value range. The structure is as follows: "hyper-parameter": [lower_bound, upper_bound]. Currently, only the following hyper-parameters can be optimized:
     params = {
             "learning_rate":[1e-4,1],
-            "eta": [1e-5, 1],                   
+            "eta": [1e-5, 1],    
+            "n_estimators": [10, 256],               
             "max_depth": [1, 5],
             "gamma": [1e-8, 40],
             "subsample": [0.2, 1.0],
@@ -167,7 +170,7 @@ def fit_xgboost(
         direction=direction,
         sample_weight=sample_weight,
         sample_weight_eval_set= sample_weight_eval_set,
-        verbose_eval = 100,
+        verbose_eval = 1000,
         max_minutes=120,           # Time budget in minutes, i.e., stop study after the given number of minutes.
         n_trials=30,             # The number of trials. If this argument is set to None, there is no limitation on the number of trials.
         silence=False             # Controls the verbosity of the trail, i.e., user can silence the outputs of the trail.
@@ -207,6 +210,8 @@ def CV_train_classifier(
     num_actors = 10,
     cpus_per_actor = 1,
     embargo_pct=0.01,
+    eval_metric= "auc",
+    direction='maximize',
     return_info = False,
 ):
     cv = CombinatorialPurgedCV(
@@ -243,6 +248,8 @@ def CV_train_classifier(
             cpus_per_actor=cpus_per_actor,
             sample_weight = train_sample_weight,
             sample_weight_eval_set = test_sample_weight,
+            eval_metric= eval_metric,
+            direction=direction,
         )
         models.append(model)
         gc.collect()
