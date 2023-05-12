@@ -123,7 +123,7 @@ impl OrderBlockDetector {
             let min_low_idx = low_values.iter().enumerate().min_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();            
             let h = high_values[self.order];
             let l = low_values[self.order];
-            if max_high_idx  == self.order
+            if max_high_idx  == self.order && self.close_array[self.close_array.len() -self.order] < l
             {
                 self.blocks.push_back(
                     OrderBlock{
@@ -137,7 +137,7 @@ impl OrderBlockDetector {
                 );
             }
             
-            if min_low_idx == self.order
+            if min_low_idx == self.order && self.close_array[self.close_array.len()-self.order] > h 
             {
                 self.blocks.push_back(
                     OrderBlock{
