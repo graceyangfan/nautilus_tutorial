@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+"""
+  script to download metrics.
+  set the absoluate path destination folder for STORE_DIRECTORY, and run
+
+  e.g. STORE_DIRECTORY=/example_data/ python3 download-metrics.py -s 1000PEPE -t um -i 5m -skip_daily  0 -startDate 2023-05-01 -endDate 2023-06-17
+
+"""
+
+import sys
+from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentTypeError
+from datetime import *
+import pandas as pd
+from enums import *
+from utility import download_file, get_all_symbols, get_parser, get_start_end_date_objects, convert_to_date_object, \
+  get_path
+
+def download_daily_metrics(trading_type, symbols, num_symbols, dates, start_date, end_date, folder, checksum):
+    current = 0 
+    date_range = None 
+    if start_date and end_date:
+        date_range = start_date + " " + end_date
+    if not start_date:
+        start_date = START_DATE
+    else:
+        start_date = convert_to_date_object(start_date)
+    
+    if not end_date:
+        end_date = END_DATE
+    else:
+        end_date = convert_to_date_object(end_date)
+    print("Found {} symbols".format(num_symbols))
+    for symbol in symbols:
+        print("[{}/{}] - start download daily metrics ".format(current+1, num_symbols, symbol))
+        for date in dates:
+            current_date = convert_to_date_object(date)
+            if current_date >= start_date and current_date <= end_date:
+                path = get_path(trading_type, "metrics", "daily", symbol)
+                file_name = "{}-metrics-{}.zip".format(symbol.upper(), date)
+                download_file(path, file_name, date_range, folder)
+                if checksum == 1:
+                    checksum_path = get_path(trading_type, "metrics", "daily", symbol)
+                    checksum_file_name = "{}-metrics-{}.zip.CHECKSUM".format(symbol.upper(), date)
+                    download_file(checksum_path, checksum_file_name, date_range, folder)
+        current += 1
+    
+if __name__ == "__main__":
+    parser = get_parser('metrics')
+    args = parser.parse_args(sys.argv[1:])
+
+    if not args.symbols:
+      print("fetching all symbols from exchange")
+      symbols = get_all_symbols(args.type)
+      num_symbols = len(symbols)
+    else:
+      symbols = args.symbols
+      num_symbols = len(symbols)
+      print("fetching {} symbols from exchange".format(num_symbols))
+
+    if args.dates:
+      dates = args.dates
+    else:
+      period = convert_to_date_object(datetime.today().strftime('%Y-%m-%d')) - convert_to_date_object(
+        PERIOD_START_DATE)
+      dates = pd.date_range(end=datetime.today(), periods=period.days + 1).to_pydatetime().tolist()
+      dates = [date.strftime("%Y-%m-%d") for date in dates]
+    if args.skip_daily == 0:
+      download_daily_metrics(args.type, symbols, num_symbols, dates, args.startDate, args.endDate, args.folder, args.checksum)
+    
