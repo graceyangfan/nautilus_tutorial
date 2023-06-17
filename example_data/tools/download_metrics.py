@@ -4,7 +4,7 @@
   script to download metrics.
   set the absoluate path destination folder for STORE_DIRECTORY, and run
 
-  e.g. STORE_DIRECTORY=/example_data/ python3 download-metrics.py -s 1000PEPE -t um -i 5m -skip_daily  0 -startDate 2023-05-01 -endDate 2023-06-17
+  e.g. STORE_DIRECTORY=../example_data/ python3 download_metrics.py -s 1000PEPEUSDT -t um  -startDate 2023-05-01 -endDate 2023-06-17
 
 """
 
