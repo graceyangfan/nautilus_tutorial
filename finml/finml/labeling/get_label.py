@@ -42,7 +42,7 @@ def create_label(
 
         is_first_line = (len(zigzags) == 1) 
         if is_first_line:
-            perc_change_since_pivot = calc_change_since_pivot(item[-1],zigzags[-1]["value"])
+            perc_change_since_pivot = calc_change_since_pivot(item[1],zigzags[-1]["value"])
             if abs(perc_change_since_pivot) >= threshold:
                 if perc_change_since_pivot > 0:
                     zigzags.append(get_zigzag(idx, item,"Peak"))
@@ -56,17 +56,17 @@ def create_label(
         last_pivot = float(zigzags[-1]["value"])
         # based on last pivot type, look for reversal or continuation
         if(is_through):
-            perc_change_since_pivot = calc_change_since_pivot(item[-1],zigzags[-1]["value"])
+            perc_change_since_pivot = calc_change_since_pivot(item[1],zigzags[-1]["value"])
             is_reversing = (perc_change_since_pivot >= threshold) or is_ending
-            is_continuing = item[-1] <= last_pivot
+            is_continuing = item[1] <= last_pivot
             if (is_continuing): 
                 zigzags[-1] = get_zigzag(idx,item, "Trough")
             elif (is_reversing): 
                 zigzags.append(get_zigzag(idx,item, "Peak"))
         else:
-            perc_change_since_pivot = calc_change_since_pivot(item[-1],zigzags[-1]["value"])
+            perc_change_since_pivot = calc_change_since_pivot(item[1],zigzags[-1]["value"])
             is_reversing = (perc_change_since_pivot <= -threshold) or is_ending
-            is_continuing = item[-1] >= last_pivot
+            is_continuing = item[1] >= last_pivot
             if(is_continuing): 
                 zigzags[-1] = get_zigzag(idx,item, "Peak")
             elif (is_reversing): 
@@ -88,12 +88,13 @@ def create_label(
     )
     correct_label = [] 
     event_ends = [] 
-    data_source = [] 
     if stop_loss:
         total_returns = df.select("label").to_numpy().flatten() 
         original_event_ends = df.select("event_ends").to_numpy().flatten() 
         original_datetime = df.select("datetime").to_numpy().flatten() 
         close_array = df.select("close").to_numpy().flatten() 
+        high_array = df.select("high").to_numpy().flatten()
+        low_array = df.select("low").to_numpy().flatten()
 
         for i in range(zigzags.shape[0]-1):
             start_idx = zigzags[i,"idx"]
@@ -101,45 +102,28 @@ def create_label(
             next_end_idx = zigzags[i+2,"idx"] if i+2 < zigzags.shape[0] else df.shape[0]-1
             for j in range(start_idx,end_idx):
                 if total_returns[j] > 0:
-                    if total_returns[j] > threshold/4.0:# safe 
-                        data_source.append(0)
-                        min_acc_arg = np.argmin(close_array[j+1:end_idx+1]) + j+1
-                        min_acc = min((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
-                        if min_acc > -stop_loss:
-                            correct_label.append(total_returns[j])
-                            event_ends.append(original_event_ends[j])
-                        else:
-                            correct_label.append(min_acc)
-                            event_ends.append(original_datetime[min_acc_arg])
-                    else:# unsafe 
-                        data_source.append(1)
-                        min_acc_arg = np.argmin(close_array[j+1:next_end_idx+1]) + j+1
-                        min_acc = min((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
+                    min_acc_arg = np.argmin(low_array[j+1:end_idx+1]) + j+1
+                    min_acc = min((low_array[min_acc_arg]-close_array[j])/close_array[j],0)
+                    if min_acc > -stop_loss:
+                        correct_label.append(total_returns[j])
+                        event_ends.append(original_event_ends[j])
+                    else:
                         correct_label.append(min_acc)
                         event_ends.append(original_datetime[min_acc_arg])
                 else:
-                    if total_returns[j] < -threshold/4.0:# safe 
-                        data_source.append(0)
-                        min_acc_arg = np.argmax(close_array[j+1:end_idx+1]) + j+1
-                        min_acc = max((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
-                        if min_acc <stop_loss:
-                            correct_label.append(total_returns[j])
-                            event_ends.append(original_event_ends[j])
-                        else:
-                            correct_label.append(min_acc)
-                            event_ends.append(original_datetime[min_acc_arg])
+                    min_acc_arg = np.argmax(high_array[j+1:end_idx+1]) + j+1
+                    min_acc = max((high_array[min_acc_arg]-close_array[j])/close_array[j],0)
+                    if min_acc < stop_loss:
+                        correct_label.append(total_returns[j])
+                        event_ends.append(original_event_ends[j])
                     else:
-                        data_source.append(1)
-                        min_acc_arg = np.argmax(close_array[j+1:next_end_idx+1]) + j+1
-                        min_acc = max((close_array[min_acc_arg]-close_array[j])/close_array[j],0)
                         correct_label.append(min_acc)
                         event_ends.append(original_datetime[min_acc_arg])
         #replace label of df 
         df = df[:len(correct_label),:]
         df.replace("label",pl.Series(correct_label))
         df.replace("event_ends",pl.Series(event_ends))
-        df = pl.concat([df,pl.DataFrame({"source":data_source})],how='horizontal')
-
+       
     ## drop the front data because zigzag is meanless on these data 
     df = df.filter((pl.col("datetime")>=zigzags[1,"datetime"]))
 
