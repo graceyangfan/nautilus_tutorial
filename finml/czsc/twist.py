@@ -173,23 +173,29 @@ class Twist:
         if self.use_rsi:
             strategy.register_indicator_for_bars(self.bar_type, self.rsi)
 
-    def on_bar(self,bar: Bar):
-        ## update newbar 
-        ## update indciator 
-        #self.memory_reduce()
-        self.update_info(bar) 
-
+    def update_raw(
+        self,
+        ts_event,
+        open,
+        high,
+        low,
+        close,
+        volume
+    ):
+        """
+        Update the raw data
+        """
         info = None 
         new_bar = NewBar(
             bar_type = self.bar_type,
             index = self.bar_count,
-            ts_opened = bar.ts_event,
-            ts_closed =  bar.ts_event,
-            open = bar.open.as_double(),
-            high = bar.high.as_double(),
-            low = bar.low.as_double(),
-            close = bar.close.as_double(),
-            volume = bar.volume.as_double(),
+            ts_opened = ts_event,
+            ts_closed =  ts_event,
+            open = open,
+            high = high,
+            low = low,
+            close = close,
+            volume = volume,
             info = info,
         )
         self.newbars.append(new_bar) 
@@ -212,6 +218,21 @@ class Twist:
         self.process_trade_point(LineType.XD) if xd_update else None
         ##update bar_count 
         self.bar_count += 1
+        
+
+    def on_bar(self,bar: Bar):
+        ## update newbar 
+        ## update indciator 
+        #self.memory_reduce()
+        self.update_info(bar)
+        self.update_raw(
+            ts_event = bar.ts_event,
+            open = bar.open.as_double(),
+            high = bar.high.as_double(),
+            low = bar.low.as_double(),
+            close = bar.close.as_double(),
+            volume = bar.volume.as_double(),
+        )
 
     def update_info(self,bar: Bar):
         #self.macd.update_raw(bar.close.as_double()) 
@@ -1563,23 +1584,6 @@ class Twist:
         start = line.end.middle_twist_bar.b_index+1
         fx_bars = self.newbars[start:]
         return np.sum([bar.close*bar.volume for bar in fx_bars])/np.sum([bar.volume for bar in fx_bars])
-
-    def is_extra_line(
-        self,
-        line: LINE,
-        run_type: LineType = LineType.BI,
-    ):
-        """
-        check if the line is a extra line 
-        """
-        if run_type == LineType.BI:
-           
-        else:
-            if line.end.middle_twist_bar.x_index == len(self.xds)-1:
-                return True
-            else:
-                return False
-
 
     def memory_reduce(self):
         if len(self.newbars) > self.bar_capacity:

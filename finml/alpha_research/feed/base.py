@@ -10,7 +10,7 @@ class Expression(metaclass=ABCMeta):
     _expr_update: bool = False 
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        raise NotImplementedError("This function must be implemented in your newly defined feature")
+        raise NotImplementedError("This function must be implemented in your newly defined expression")
 
     def batch_update(self, data: pl.LazyFrame) -> Union[pl.LazyFrame, float, int]:
         return data.select(self.expr)
@@ -24,7 +24,7 @@ class Expression(metaclass=ABCMeta):
 
     @property
     def is_featured(self): 
-        raise NotImplementedError("This function must be implemented in your newly defined feature")
+        raise NotImplementedError("This function must be implemented in your newly defined expression")
     
 
 class Feature(Expression):
@@ -83,8 +83,8 @@ class Operator(Expression):
 
 
 class UnaryOperator(Operator):
-    def __init__(self, feature: Union[Feature, float, int]) -> None:
-        self._feature = feature if isinstance(feature, Feature) else Constant(feature)
+    def __init__(self, hs: Union[Expression, float, int]) -> None:
+        self._hs = hs if isinstance(hs, Expression) else Constant(hs)
 
     @classmethod
     def n_args(cls) -> int: 
@@ -95,17 +95,21 @@ class UnaryOperator(Operator):
         return UnaryOperator
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}({self._feature})"
+        return f"{type(self).__name__}({self._hs})"
 
     @property
     def is_featured(self): 
-        return self._feature.is_featured
+        return self._hs.is_featured
 
 
 class BinaryOperator(Operator):
-    def __init__(self, lhs: Union[Feature, float, int], rhs: Union[Feature, float, int]) -> None:
-        self._lhs = lhs if isinstance(lhs, Feature) else Constant(lhs)
-        self._rhs = rhs if isinstance(rhs, Feature) else Constant(rhs)
+    def __init__(
+        self, 
+        lhs: Union[Expression, float, int], 
+        rhs: Union[Expression, float, int]
+    ) -> None:
+        self._lhs = lhs if isinstance(lhs, Expression) else Constant(lhs)
+        self._rhs = rhs if isinstance(rhs, Expression) else Constant(rhs)
 
     @classmethod
     def n_args(cls) -> int: 
@@ -121,6 +125,83 @@ class BinaryOperator(Operator):
     @property
     def is_featured(self): 
         return self._lhs.is_featured or self._rhs.is_featured
+
+class TripleOperator(Operator):
+    def __init__(
+        self, 
+        lhs: Union[Expression, float, int], 
+        mhs: Union[Expression, float, int], 
+        rhs: Union[Expression, float, int]
+    ) -> None:
+        self._lhs = lhs if isinstance(lhs, Expression) else Constant(lhs)
+        self._mhs = mhs if isinstance(mhs, Expression) else Constant(mhs)
+        self._rhs = rhs if isinstance(rhs, Expression) else Constant(rhs)
+
+    @classmethod
+    def n_args(cls) -> int: 
+        return 3
+
+    @classmethod
+    def category_type(cls) -> Type['Operator']:
+        return TripleOperator
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}({self._lhs},{self._mhs},{self._rhs})"
+
+    @property
+    def is_featured(self): 
+        return self._lhs.is_featured or self._mhs.is_featured or self._rhs.is_featured
+
+class RollingOperator(Operator):
+    def __init__(
+        self, 
+        hs: Union[Expression, float, int],
+        window_size: int
+    ) -> None:
+        self._hs = hs if isinstance(hs, Expression) else Constant(hs)
+        self._window_size = window_size
+
+    @classmethod
+    def n_args(cls) -> int: 
+        return 2
+
+    @classmethod
+    def category_type(cls) -> Type['Operator']:
+        return RollingOperator
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}({self._hs},{self._window})"
+
+    @property
+    def is_featured(self):
+        return self._hs.is_featured
+
+class PairRollingOperator(Operator):
+    def __init__(
+        self, 
+        lhs: Union[Expression, float, int], 
+        rhs: Union[Expression, float, int], 
+        window_size: int
+    ) -> None:
+        self._lhs = lhs if isinstance(lhs, Expression) else Constant(lhs)
+        self._rhs = rhs if isinstance(rhs, Expression) else Constant(rhs)
+        self._window_size = window_size 
+
+    @classmethod
+    def n_args(cls) -> int: 
+        return 3
+
+    @classmethod
+    def category_type(cls) -> Type['Operator']:
+        return PairRollingOperator
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}({self._lhs},{self._rhs},{self._window})"
+
+    @property
+    def is_featured(self):
+        return self._lhs.is_featured or self._rhs.is_featured
+
 
 # class Add(BinaryOperator):
 #     @property
