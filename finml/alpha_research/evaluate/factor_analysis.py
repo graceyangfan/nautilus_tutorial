@@ -123,7 +123,7 @@ def _pred_ic(
                 [pl.corr("label",analysis_column, method = _methods_mapping["IC"]).alias("IC")]).sort("datetime")
     ic_df = pred_label.groupby("datetime").agg(
                 [pl.corr("label",analysis_column, method = _methods_mapping["Rank IC"]).alias("Rank IC")]).sort("datetime")
-    ic_df = ic_df.join(_ic,on="datetime",how="inner")
+    #ic_df = ic_df.join(_ic,on="datetime",how="inner")
 
     monthly_ic = _ic.with_columns([pl.col("datetime").dt.month().alias("Month"),pl.col("datetime").dt.year().alias("Year")])
     monthly_ic = monthly_ic.groupby(["Year","Month"], maintain_order=True).agg(pl.col("IC").mean())
@@ -245,7 +245,7 @@ def ic_figure(ic_df: pl.DataFrame, **kwargs) -> go.Figure:
     ic_bar_figure = BarGraph(
         ic_df,
         layout=dict(
-            title="Information Coefficient (IC)",
+            title="Ranked Information Coefficient (Rank IC)",
             xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ic_df.select(pl.col("datetime"))))),
         ),
     ).figure
