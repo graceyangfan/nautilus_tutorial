@@ -123,11 +123,11 @@ def _pred_ic(
                 [pl.corr("label",analysis_column, method = _methods_mapping["IC"]).alias("IC")]).sort("datetime")
     ic_df = pred_label.groupby("datetime").agg(
                 [pl.corr("label",analysis_column, method = _methods_mapping["Rank IC"]).alias("Rank IC")]).sort("datetime")
-    #ic_df = ic_df.join(_ic,on="datetime",how="inner")
+    ic_df = ic_df.join(_ic,on="datetime",how="inner")
 
     monthly_ic = _ic.with_columns([pl.col("datetime").dt.month().alias("Month"),pl.col("datetime").dt.year().alias("Year")])
     monthly_ic = monthly_ic.groupby(["Year","Month"], maintain_order=True).agg(pl.col("IC").mean())
-    ic_bar_figure = ic_figure(ic_df)
+    ic_bar_figure,rank_ic_bar_figure = ic_figure(ic_df)
 
     ic_heatmap_figure = HeatmapGraph(
         monthly_ic.pivot(values="IC",index="Year",columns="Month"),
@@ -176,7 +176,7 @@ def _pred_ic(
         ),
     ).figure
 
-    return ic_bar_figure, ic_heatmap_figure, ic_hist_figure
+    return (ic_bar_figure, rank_ic_bar_figure, ic_heatmap_figure, ic_hist_figure)
 
 
 def _pred_autocorr(
@@ -223,14 +223,21 @@ def _pred_turnover(
               ).sum()/(pl.count()//N)).alias("bottom")
     ]).sort("datetime")
     r_df = top.join(bottom,on="datetime",how="inner")
-    turnover_figure = ScatterGraph(
-        r_df,
+    turnover_figure_top = ScatterGraph(
+        r_df.select(["datetime","top"]),
         layout=dict(
-            title="Top-Bottom Turnover",
+            title="Top Turnover",
             xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(r_df.select(pl.col("datetime"))))),
         ),
     ).figure
-    return (turnover_figure,)
+    turnover_figure_bottom = ScatterGraph(
+        r_df.select(["datetime","bottom"]),
+        layout=dict(
+            title="Bottom Turnover",
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(r_df.select(pl.col("datetime"))))),
+        ),
+    ).figure
+    return (turnover_figure_top, turnover_figure_bottom)
 
 
 def ic_figure(ic_df: pl.DataFrame, **kwargs) -> go.Figure:
@@ -243,13 +250,20 @@ def ic_figure(ic_df: pl.DataFrame, **kwargs) -> go.Figure:
     :return: plotly.graph_objs.Figure
     """
     ic_bar_figure = BarGraph(
-        ic_df,
+        ic_df.select(["datetime", "IC"]),
+        layout=dict(
+            title="Information Coefficient (IC)",
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ic_df.select(pl.col("datetime"))))),
+        ),
+    ).figure
+    rank_ic_bar_figure = BarGraph(
+        ic_df.select(["datetime", "Rank IC"]),
         layout=dict(
             title="Ranked Information Coefficient (Rank IC)",
             xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ic_df.select(pl.col("datetime"))))),
         ),
     ).figure
-    return ic_bar_figure
+    return (ic_bar_figure,rank_ic_bar_figure)
 
 def factor_performance_graph(
     pred_label: pl.DataFrame,
@@ -258,7 +272,7 @@ def factor_performance_graph(
     N: int = 5,
     reverse=False,
     rank=False,
-    graph_names: list = ["group_return", "pred_ic", "pred_autocorr"],
+    graph_names: list = ["group_return", "pred_ic", "pred_autocorr","pred_turnover"],
     show_notebook: bool = True,
     show_nature_day: bool = False,
     **kwargs,
