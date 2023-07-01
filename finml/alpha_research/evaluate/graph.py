@@ -42,6 +42,8 @@ class BaseGraph:
         """
         self._df = df
         self._index_column = index_column
+        self._columns = df.columns 
+        self._columns.remove(self._index_column)
 
         self._layout = dict() if layout is None else layout
         self._graph_kwargs = dict() if graph_kwargs is None else graph_kwargs
@@ -73,7 +75,7 @@ class BaseGraph:
 
         # Displayed column name
         if self._name_dict is None:
-            self._name_dict = {_item: _item for _item in self._df.columns}
+            self._name_dict = {_item: _item for _item in self._columns}
 
     @staticmethod
     def get_instance_with_graph_parameters(graph_type: str = None, **kwargs):
@@ -87,7 +89,8 @@ class BaseGraph:
             _graph_module = importlib.import_module("plotly.graph_objs")
             _graph_class = getattr(_graph_module, graph_type)
         except AttributeError:
-            _graph_module = importlib.import_module("qlib.contrib.report.graph")
+            _graph_module = importlib.import_module("graph")
+            #import .graph
             _graph_class = getattr(_graph_module, graph_type)
         return _graph_class(**kwargs)
 
@@ -119,20 +122,24 @@ class BaseGraph:
 
         :return:
         """
-        return go.Layout(**self._layout)
+        return go.Layout(height = 500, **self._layout)
 
     def _get_data(self) -> list:
         """
 
         :return:
         """
-
         _data = [
             self.get_instance_with_graph_parameters(
-                graph_type=self._graph_type, x=self._df[self._index_column], y=self._df[_col], name=_name, **self._graph_kwargs
+                graph_type=self._graph_type, 
+                x=self._df[self._index_column].to_numpy(), 
+                y=self._df[_col].to_numpy(), 
+                name=_name, 
+                **self._graph_kwargs
             )
             for _col, _name in self._name_dict.items()
         ]
+
         return _data
 
     @property
@@ -164,7 +171,7 @@ class DistplotGraph(BaseGraph):
         :return:
         """
         _t_df = self._df.drop_nulls()
-        _data_list = [_t_df[_col] for _col in self._name_dict]
+        _data_list = [_t_df[_col].to_numpy() for _col in self._name_dict]
         _label_list = list(self._name_dict.values())
         _fig = create_distplot(_data_list, _label_list, show_rug=False, **self._graph_kwargs)
 
@@ -182,9 +189,9 @@ class HeatmapGraph(BaseGraph):
         _data = [
             self.get_instance_with_graph_parameters(
                 graph_type=self._graph_type,
-                x=self._df.columns,
-                y=self._df[self._index_column],
-                z=self._df.to_numpy().tolist(),
+                x=self._columns,
+                y=self._df[self._index_column].to_numpy(),
+                z=self._df[self._columns].to_numpy(),
                 **self._graph_kwargs
             )
         ]
@@ -201,7 +208,10 @@ class HistogramGraph(BaseGraph):
         """
         _data = [
             self.get_instance_with_graph_parameters(
-                graph_type=self._graph_type, x=self._df[_col], name=_name, **self._graph_kwargs
+                graph_type=self._graph_type, 
+                x=self._df[_col].to_numpy(),
+                name=_name, 
+                **self._graph_kwargs
             )
             for _col, _name in self._name_dict.items()
         ]
@@ -217,6 +227,7 @@ class SubplotsGraph:
     def __init__(
         self,
         df: pl.DataFrame = None,
+        index_column = "datetime",
         kind_map: dict = None,
         layout: dict = None,
         sub_graph_layout: dict = None,
@@ -279,6 +290,9 @@ class SubplotsGraph:
         """
 
         self._df = df
+        self._index_column = index_column
+        self._columns = df.columns 
+        self._columns.remove(self._index_column)
         self._layout = layout
         self._sub_graph_layout = sub_graph_layout
 
@@ -292,7 +306,7 @@ class SubplotsGraph:
 
         self.__cols = self._subplots_kwargs.get("cols", 2)  # pylint: disable=W0238
         self.__rows = self._subplots_kwargs.get(  # pylint: disable=W0238
-            "rows", math.ceil(len(self._df.columns) / self.__cols)
+            "rows", math.ceil(len(self._columns) / self.__cols)
         )
 
         self._sub_graph_data = sub_graph_data
@@ -309,7 +323,7 @@ class SubplotsGraph:
         self._sub_graph_data = []
         self._subplot_titles = []
 
-        for i, column_name in enumerate(self._df.columns):
+        for i, column_name in enumerate(self._columns):
             row = math.ceil((i + 1) / self.__cols)
             _temp = (i + 1) % self.__cols
             col = _temp if _temp else self.__cols
@@ -334,7 +348,7 @@ class SubplotsGraph:
         """
         # Default cols, rows
         _cols = 2
-        _rows = math.ceil(len(self._df.columns) / 2)
+        _rows = math.ceil(len(self._columns) / 2)
         self._subplots_kwargs = dict()
         self._subplots_kwargs["rows"] = _rows
         self._subplots_kwargs["cols"] = _cols
@@ -342,7 +356,7 @@ class SubplotsGraph:
         self._subplots_kwargs["shared_yaxes"] = False
         self._subplots_kwargs["vertical_spacing"] = 0.3 / _rows
         self._subplots_kwargs["print_grid"] = False
-        self._subplots_kwargs["subplot_titles"] = self._df.columns
+        self._subplots_kwargs["subplot_titles"] = self._columns
 
     def _init_figure(self):
         """
@@ -361,7 +375,8 @@ class SubplotsGraph:
                 _graph_obj = BaseGraph.get_instance_with_graph_parameters(
                     kind,
                     **dict(
-                        df=self._df[column_name],
+                        df=self._df.select(["datetime",column_name]),
+                        index_column = "datetime",
                         name_dict={column_name: temp_name},
                         graph_kwargs=_graph_kwargs,
                     )

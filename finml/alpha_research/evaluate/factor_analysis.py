@@ -1,6 +1,9 @@
 import polars as pl
 import statsmodels.api as sm
 import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+from scipy import stats
+from typing import Sequence, Literal
 from  graph import ScatterGraph, SubplotsGraph, BarGraph, HeatmapGraph
 from  utils import guess_plotly_rangebreaks
 
@@ -21,13 +24,14 @@ def _group_return(
     # Group1 ~ Group5 only consider the dropna values
     pred_label_drop = pred_label.drop_nulls(subset=[analysis_column])
 
-    # Group
-    t_df = pred_label_drop.groupby("datetime",maintain_order=True).agg([pl.col("label").mean().alias("average")])
+    # Group 
+    expressions = [pl.col("label").mean().alias("average")]
     for i in range(N):
-        _tmp_df = pred_label_drop.groupby("datetime",maintain_order=True).agg(
-                [pl.col("label").slice(pl.count()//N * i, pl.count()//N * (i+1)).mean()])
-        t_df = t_df.join(_tmp_df,on="datetime",how="inner")
-    
+        expressions.append(
+            pl.col("label").slice(pl.count()//N * i, pl.count()//N * (i+1)).mean().alias(f"Group{i+1}")
+        )
+    t_df = pred_label_drop.groupby("datetime").agg(expressions).sort("datetime")
+
     #Long-Short,Long-Average
     t_df = t_df.with_columns([
         (pl.col("Group1") - pl.col(f"Group{N}")).alias("long-short"),
@@ -37,17 +41,18 @@ def _group_return(
     t_df = t_df.drop_nulls()  # for days which does not contain label
     # Cumulative Return By Group
     group_scatter_figure = ScatterGraph(
-        t_df.cumsum(),
+        t_df.select([pl.col("datetime"),pl.all().exclude("datetime").cumsum()]),
         layout=dict(
             title="Cumulative Return",
-            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(t_df["datetime"]))),
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(t_df.select(pl.col("datetime"))))),
         ),
     ).figure
 
-    t_df = t_df.select(["long-short", "long-average"])
-    _bin_size = float(((t_df.max() - t_df.min()) / 20).min())
+    tmp_df = t_df.select(["long-short", "long-average"])
+    _bin_size = ((tmp_df.max() - tmp_df.min()) / 20).min(axis=1)[0]
     group_hist_figure = SubplotsGraph(
-        t_df,
+        t_df.select(["datetime","long-short", "long-average"]),
+        index_column = "datetime",
         kind_map=dict(kind="DistplotGraph", kwargs=dict(bin_size=_bin_size)),
         subplots_kwargs=dict(
             rows=1,
@@ -69,7 +74,7 @@ def _plot_qq(data: pl.Series = None, dist=stats.norm) -> go.Figure:
     # NOTE: plotly.tools.mpl_to_plotly not actively maintained, resulting in errors in the new version of matplotlib,
     # ref: https://github.com/plotly/plotly.py/issues/2913#issuecomment-730071567
     # removing plotly.tools.mpl_to_plotly for greater compatibility with matplotlib versions
-    _plt_fig = sm.qqplot(data.drop_nulls(), dist=dist, fit=True, line="45")
+    _plt_fig = sm.qqplot(data.drop_nulls().to_numpy(), dist=dist, fit=True, line="45")
     plt.close(_plt_fig)
     qqplot_data = _plt_fig.gca().lines
     fig = go.Figure()
@@ -114,20 +119,19 @@ def _pred_ic(
     :return:
     """
     _methods_mapping = {"IC": "pearson", "Rank IC": "spearman"}
-    analysis_column = "$open"
-    _ic = pf.groupby("datetime",maintain_order=True).agg(
-                [pl.corr("label",analysis_column, method = _methods_mapping["IC"]).alias("IC")])
-    ic_df = pf.groupby("datetime",maintain_order=True).agg(
-                [pl.corr("label",analysis_column, method = _methods_mapping["Rank IC"]).alias("Rank IC")])
+    _ic = pred_label.groupby("datetime").agg(
+                [pl.corr("label",analysis_column, method = _methods_mapping["IC"]).alias("IC")]).sort("datetime")
+    ic_df = pred_label.groupby("datetime").agg(
+                [pl.corr("label",analysis_column, method = _methods_mapping["Rank IC"]).alias("Rank IC")]).sort("datetime")
     ic_df = ic_df.join(_ic,on="datetime",how="inner")
 
     monthly_ic = _ic.with_columns([pl.col("datetime").dt.month().alias("Month"),pl.col("datetime").dt.year().alias("Year")])
-    monthly_ic = monthly_ic.groupby(["Year","Month"],maintain_order=True).agg(pl.col("IC").mean())
-   
+    monthly_ic = monthly_ic.groupby(["Year","Month"], maintain_order=True).agg(pl.col("IC").mean())
     ic_bar_figure = ic_figure(ic_df)
 
     ic_heatmap_figure = HeatmapGraph(
-        _monthly_ic.pivot(values="IC",index="Year",columns="Month"),
+        monthly_ic.pivot(values="IC",index="Year",columns="Month"),
+        index_column = "Year",
         layout=dict(title="Monthly IC", xaxis=dict(dtick=1), yaxis=dict(tickformat="04d", dtick=1)),
         graph_kwargs=dict(xtype="array", ytype="array"),
     ).figure
@@ -157,6 +161,7 @@ def _pred_ic(
     ]
     ic_hist_figure = SubplotsGraph(
         _ic.drop_nulls(),
+        index_column = "datetime",
         kind_map=dict(kind="HistogramGraph", kwargs=dict()),
         subplots_kwargs=dict(
             rows=1,
@@ -175,7 +180,7 @@ def _pred_ic(
 
 
 def _pred_autocorr(
-    pred_label: pl.DataFrame = None, 
+    pred_label: pl.DataFrame, 
     analysis_column,
     lag=1, 
     **kwargs
@@ -185,12 +190,12 @@ def _pred_autocorr(
         pl.col(analysis_column).shift(lag).over("instrument").alias(f"{analysis_column}_last")
     ])
 
-    ac = pred.groupby("datetime",maintain_order=True).agg([pl.corr(pl.col(analysis_column).rank()/pl.count(),pl.col(f"{analysis_column}_last").rank()/pl.count())])
+    ac = pred.groupby("datetime").agg([pl.corr(pl.col(analysis_column).rank()/pl.count(),pl.col(f"{analysis_column}_last").rank()/pl.count())]).sort("datetime")
     ac_figure = ScatterGraph(
         ac,
         layout=dict(
             title="Auto Correlation",
-            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ac["datetime"]))),
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ac.select(pl.col("datetime"))))),
         ),
     ).figure
     return (ac_figure,)
@@ -206,23 +211,23 @@ def _pred_turnover(
     pred =  pred.with_columns([
         pl.col(analysis_column).shift(lag).over("instrument").alias(f"{analysis_column}_last")
     ])
-    top = pred.groupby("datetime",maintain_order=True).agg([
+    top = pred.groupby("datetime").agg([
         (1.0 - (pl.col("instrument").sort_by(analysis_column,descending=True).slice(0,pl.count()//N).is_in(
             pl.col("instrument").sort_by(f"{analysis_column}_last",descending=True).slice(0,pl.count()//N))
               ).sum()/(pl.count()//N)).alias("top")
-    ])
+    ]).sort("datetime")
     
-    bottom = pred.groupby("datetime",maintain_order=True).agg([
+    bottom = pred.groupby("datetime").agg([
         (1.0 - (pl.col("instrument").sort_by(analysis_column,descending=False).slice(0,pl.count()//N).is_in(
             pl.col("instrument").sort_by(f"{analysis_column}_last",descending=False).slice(0,pl.count()//N))
               ).sum()/(pl.count()//N)).alias("bottom")
-    ])
+    ]).sort("datetime")
     r_df = top.join(bottom,on="datetime",how="inner")
     turnover_figure = ScatterGraph(
         r_df,
         layout=dict(
             title="Top-Bottom Turnover",
-            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(r_df["datetime"]))),
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(r_df.select(pl.col("datetime"))))),
         ),
     ).figure
     return (turnover_figure,)
@@ -241,7 +246,7 @@ def ic_figure(ic_df: pl.DataFrame, **kwargs) -> go.Figure:
         ic_df,
         layout=dict(
             title="Information Coefficient (IC)",
-            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ic_df["datetime"]))),
+            xaxis=dict(tickangle=45, rangebreaks=kwargs.get("rangebreaks", guess_plotly_rangebreaks(ic_df.select(pl.col("datetime"))))),
         ),
     ).figure
     return ic_bar_figure

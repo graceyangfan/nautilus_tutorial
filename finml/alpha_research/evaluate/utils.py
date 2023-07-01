@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 # replace pandas with polars 
 import matplotlib.pyplot as plt
-import poalrs as pl 
+import polars as pl 
 
 
 def sub_fig_generator(sub_fs=(3, 3), col_n=10, row_n=1, wspace=None, hspace=None, sharex=False, sharey=False):
@@ -67,7 +67,7 @@ def guess_plotly_rangebreaks(dt_index: pl.Datetime):
     """
     dt_idx = dt_index.sort(dt_index.columns[0])
     dt_idx = dt_idx.select(pl.col(dt_index.columns[0]).alias("index"))
-    dt  = dt_idx.with_columns([(pl.col("index").diff(1)).alias("gaps")])
+    dt  = dt_idx.with_columns([(pl.col("index").diff(1)).shift(-1).alias("gaps")])
     dt  = dt.drop_nulls() 
     min_gap = dt.select(pl.col("gaps").min())[0,0]
     gaps_to_break = {}
