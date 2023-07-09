@@ -187,7 +187,7 @@ def _pred_autocorr(
 ) -> tuple:
     pred = pred_label.clone()
     pred =  pred.with_columns([
-        pl.col(analysis_column).shift(lag).over("instrument").alias(f"{analysis_column}_last")
+        pl.col(analysis_column).sort_by("datetime").shift(lag).over("instrument",mapping_strategy="explode").alias(f"{analysis_column}_last")
     ])
 
     ac = pred.groupby("datetime").agg([pl.corr(pl.col(analysis_column).rank()/pl.count(),pl.col(f"{analysis_column}_last").rank()/pl.count())]).sort("datetime")
@@ -209,7 +209,7 @@ def _pred_turnover(
 ) -> tuple:
     pred = pred_label.clone()
     pred =  pred.with_columns([
-        pl.col(analysis_column).shift(lag).over("instrument").alias(f"{analysis_column}_last")
+        pl.col(analysis_column).sort_by("datetime").shift(lag).over("instrument", mapping_strategy="explode").alias(f"{analysis_column}_last")
     ])
     top = pred.groupby("datetime").agg([
         (1.0 - (pl.col("instrument").sort_by(analysis_column,descending=True).slice(0,pl.count()//N).is_in(
