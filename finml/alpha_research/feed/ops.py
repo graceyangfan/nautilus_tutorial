@@ -1,6 +1,7 @@
 import numpy as np
 import polars as pl 
 from Type import Union
+from .plexpr_func import slope, rsqure, residual
 from .base import (
     Expression,
     Feature,
@@ -9,7 +10,8 @@ from .base import (
     BinaryOperator,
     TripleOperator,
     RollingOperator,
-    PairRollingOperator
+    PairRollingOperator,
+    CrossSectionalOperator
 )
 
 class Abs(UnaryOperator):
@@ -159,6 +161,16 @@ class Or(BinaryOperator):
             self._expr_update = True 
         return self._expr
 
+class Power(BinaryOperator):
+    # two features' row by left.pow(right)
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            self._expr = self._lhs.expr.pow(self._rhs.expr)
+            self._expr_update = True 
+        return self._expr
+
+
 class If(TripleOperator):
     # if condition is true, return true_value, else return false_value
     @property
@@ -168,21 +180,31 @@ class If(TripleOperator):
             self._expr_update = True 
         return self._expr
 
+
+# class DiscreteNeutralize():
+#     @property 
+#     def expr(self) -> Union[pl.Expr, float, int]:
+#         if not self._expr_update:
+#             self._expr = self._hs.expr - self._hs.expr.mean()
+#             self._expr_update = True 
+#         return self._expr
+
 class Ref(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
         if not self._expr_update:
             self._expr = self._hs.expr.shift(self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
-class SMA(RollingOperator):
+
+class Mean(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_mean(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
 class EMA(RollingOperator):
     @property
@@ -190,7 +212,18 @@ class EMA(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.ewm_mean(span = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+class  WMA(RollingOperator):
+    @property 
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            w =  np.arange(self._window_size) + 1
+            w = w / w.sum()
+            self._expr = self._hs.expr.rolling_mean(window_size = self._window_size,weights=w)
+            self._expr_update = True 
+        return self._expr.over("symbol")
+
 
 class Sum(RollingOperator):
     @property
@@ -198,7 +231,17 @@ class Sum(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_sum(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+class Prod(RollingOperator):
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg(self._hs.product())
+            self._expr_update = True 
+        return self._expr.over("symbol")
 
 class Std(RollingOperator):
     @property
@@ -206,7 +249,7 @@ class Std(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_std(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
 class Var(RollingOperator):
     @property
@@ -214,7 +257,7 @@ class Var(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_var(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
 class Skew(RollingOperator):
     @property
@@ -222,7 +265,7 @@ class Skew(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_skew(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
 class Kurt(RollingOperator):
     @property
@@ -230,6 +273,7 @@ class Kurt(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_kurt(window_size = self._window_size)
             self._expr_update = True
+        return self._expr.over("symbol")
 
 class Max(RollingOperator):
     #max elements taken from the input feature
@@ -238,7 +282,17 @@ class Max(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_max(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+
+class IdxMax(RollingOperator):
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(self._hs.arg_max())
+            self._expr_update = True 
+        return self._expr.over("symbol")
+
 
 class Min(RollingOperator):
     #min elements taken from the input feature
@@ -247,7 +301,15 @@ class Min(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_min(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+class IdxMin(RollingOperator):
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(self._hs.arg_min())
+            self._expr_update = True 
+        return self._expr.over("symbol")
 
 class Quantile(RollingOperator):
     #quantile elements taken from the input feature
@@ -259,7 +321,7 @@ class Quantile(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_quantile(quantile = self._quantile, window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
     @classmethod
     def n_args(cls) -> int: 
@@ -275,7 +337,30 @@ class Median(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.rolling_median(window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+class Mad(RollingOperator):
+    #mad elements taken from the input feature
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg((self._hs - self._hs.median()).abs().median())
+            self._expr_update = True 
+        return self._expr.over("symbol")
+
+class Rank(RollingOperator):
+    """Rolling Rank (Percentile)
+    """
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg(pl.col("close").rank().last()/pl.count()/pl.count()*100) 
+            self._expr_update = True 
+        return self._expr.over("symbol")
 
 
 class Delta(RollingOperator):
@@ -285,7 +370,43 @@ class Delta(RollingOperator):
         if not self._expr_update:
             self._expr = self._hs.expr.diff(n = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+class Slope(Rolling):
+    """Rolling Slope
+    """
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg(slope(pl.col("index"),self._hs.expr))
+            self._expr_update = True 
+        return self._expr.over("symbol")
+
+class Rsquare(Rolling):
+    """Rolling Rsquare
+    """
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg(rsqure(pl.col("index"),self._hs.expr))
+            self._expr_update = True 
+        return self._expr.over("symbol")
+
+class Resi(Rolling):
+    """Rolling Regression Residuals
+    """
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update: 
+            self._expr = pl.arange(0,pl.count()).alias("index")
+            .groupby_rolling("index",period=self._window_size)
+            .agg(residual(pl.col("index"),self._hs.expr))
+            self._expr_update = True 
+        return self._expr.over("symbol")
 
 #Pair-Wise Rolling 
 class Corr(PairRollingOperator):
@@ -295,7 +416,7 @@ class Corr(PairRollingOperator):
         if not self._expr_update:
             self._expr = pl.rolling_corr(self._hs.expr, self._rhs.expr, window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
 
 class  Cov(PairRollingOperator):
     #covariance between two features in rolling window
@@ -304,4 +425,25 @@ class  Cov(PairRollingOperator):
         if not self._expr_update:
             self._expr = pl.rolling_cov(self._hs.expr, self._rhs.expr, window_size = self._window_size)
             self._expr_update = True 
-        return self._expr
+        return self._expr.over("symbol")
+
+
+#################### cross section operator ####################
+
+class CSRank(CrossSectionalOperator):
+    #cross section rank of a feature
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            self._expr = self._hs.rank()/pl.count()
+            self._expr_update = True 
+        return self._expr.over("datetime")
+
+class CSScale(CrossSectionalOperator):
+    #cross section scale of a feature
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            self._expr = self._hs / self._hs.sum()
+            self._expr_update = True 
+        return self._expr.over("datetime")

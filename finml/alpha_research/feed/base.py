@@ -13,14 +13,127 @@ class Expression(metaclass=ABCMeta):
         raise NotImplementedError("This function must be implemented in your newly defined expression")
 
     def batch_update(self, data: pl.LazyFrame) -> Union[pl.LazyFrame, float, int]:
+        """This function performance real computing on data, users must define it by themselves
+        """
         return data.select(self.expr)
 
     def __str__(self):
         return type(self).__name__
 
-    def __add__(self, other: Union["Expression", float]) -> "Add":
-        if isinstance(other, Expression):
-            return Add(self, other)
+    def __neg__(self):
+        from .ops import Neg  # pylint: disable=C0415
+
+        return Neg(self)
+
+    def __gt__(self, other):
+        from .ops import Gt  # pylint: disable=C0415
+
+        return Gt(self, other)
+
+    def __ge__(self, other):
+        from .ops import Ge  # pylint: disable=C0415
+
+        return Ge(self, other)
+
+    def __lt__(self, other):
+        from .ops import Lt  # pylint: disable=C0415
+
+        return Lt(self, other)
+
+    def __le__(self, other):
+        from .ops import Le  # pylint: disable=C0415
+
+        return Le(self, other)
+
+    def __eq__(self, other):
+        from .ops import Eq  # pylint: disable=C0415
+
+        return Eq(self, other)
+
+    def __ne__(self, other):
+        from .ops import Ne  # pylint: disable=C0415
+
+        return Ne(self, other)
+
+    def __add__(self, other):
+        from .ops import Add  # pylint: disable=C0415
+
+        return Add(self, other)
+
+    def __radd__(self, other):
+        from .ops import Add  # pylint: disable=C0415
+
+        return Add(other, self)
+
+    def __sub__(self, other):
+        from .ops import Sub  # pylint: disable=C0415
+
+        return Sub(self, other)
+
+    def __rsub__(self, other):
+        from .ops import Sub  # pylint: disable=C0415
+
+        return Sub(other, self)
+
+    def __mul__(self, other):
+        from .ops import Mul  # pylint: disable=C0415
+
+        return Mul(self, other)
+
+    def __rmul__(self, other):
+        from .ops import Mul  # pylint: disable=C0415
+
+        return Mul(self, other)
+
+    def __div__(self, other):
+        from .ops import Div  # pylint: disable=C0415
+
+        return Div(self, other)
+
+    def __rdiv__(self, other):
+        from .ops import Div  # pylint: disable=C0415
+
+        return Div(other, self)
+
+    def __truediv__(self, other):
+        from .ops import Div  # pylint: disable=C0415
+
+        return Div(self, other)
+
+    def __rtruediv__(self, other):
+        from .ops import Div  # pylint: disable=C0415
+
+        return Div(other, self)
+
+    def __pow__(self, other):
+        from .ops import Power  # pylint: disable=C0415
+
+        return Power(self, other)
+
+    def __rpow__(self, other):
+        from .ops import Power  # pylint: disable=C0415
+
+        return Power(other, self)
+
+    def __and__(self, other):
+        from .ops import And  # pylint: disable=C0415
+
+        return And(self, other)
+
+    def __rand__(self, other):
+        from .ops import And  # pylint: disable=C0415
+
+        return And(other, self)
+
+    def __or__(self, other):
+        from .ops import Or  # pylint: disable=C0415
+
+        return Or(self, other)
+
+    def __ror__(self, other):
+        from .ops import Or  # pylint: disable=C0415
+
+        return Or(other, self)
 
     @property
     def is_featured(self): 
@@ -161,6 +274,7 @@ class RollingOperator(Operator):
         self._hs = hs if isinstance(hs, Expression) else Constant(hs)
         self._window_size = window_size
 
+
     @classmethod
     def n_args(cls) -> int: 
         return 2
@@ -201,6 +315,28 @@ class PairRollingOperator(Operator):
     @property
     def is_featured(self):
         return self._lhs.is_featured or self._rhs.is_featured
+
+class CrossSectionalOperator(Operator):
+    def __init__(
+        self, 
+        hs: Union[Expression, float, int],
+    ) -> None:
+        self._hs = hs if isinstance(hs, Expression) else Constant(hs)
+
+    @classmethod
+    def n_args(cls) -> int: 
+        return 1
+
+    @classmethod
+    def category_type(cls) -> Type['Operator']:
+        return CrossSectionalOperator
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}({self._hs},{self._window})"
+
+    @property
+    def is_featured(self):
+        return self._hs.is_featured
 
 
 # class Add(BinaryOperator):
