@@ -1,1 +1,0 @@
-#write Symmetric,GramSchmidt,Canonical

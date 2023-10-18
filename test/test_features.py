@@ -27,7 +27,7 @@ def original_feature(df):
         label,
         corr_type ="pearson",
     )
-    print(f"the  factor corrections are {corr}")
+    print(f"the  factor corrections are {corr.label}")
 
 def ms_feature_evaluate(
     df,
@@ -131,7 +131,7 @@ def ms_feature_evaluate(
             label,
             corr_type ="spearman",
         )
-        print(f"the period {period} factor corrections are {corr}")
+        print(f"the period {period} factor corrections are {corr.label}")
         results.append(corr)
     return pd.concat(results,axis=0)
 
@@ -173,7 +173,7 @@ def test_entropy(
             label,
             corr_type ="spearman",
         )
-        print(f"the period {period} factor corrections are {corr}")
+        print(f"the period {period} factor corrections are {corr.label}")
         results.append(corr)
     return pd.concat(results,axis=0)
 
@@ -204,7 +204,7 @@ def test_diff(
                     label,
                     corr_type ="pearson",
                 )
-            print(f"the period {period} and order {order} factor corrections are {corr}")
+            print(f"the period {period} and order {order} factor corrections are {corr.label}")
 
 
 def test_value_diff(df):
@@ -274,7 +274,7 @@ def test_value_diff(df):
                     label,
                     corr_type ="pearson",
                 )
-        print(f"the period {period} factor corrections are {corr}")
+        print(f"the period {period} factor corrections are {corr.label}")
 
 from nautilus_trader.indicators.zscore import Zscore
 def test_zscore(df):
@@ -384,7 +384,7 @@ def test_zscore(df):
             label,
             corr_type ="pearson",
         )
-        print(f"the period {period} factor corrections are {corr}")
+        print(f"the period {period} factor corrections are {corr.label}")
 
 
 
@@ -496,7 +496,7 @@ def test_vidya(df):
             label,
             corr_type ="pearson",
         )
-        print(f"the period {period} factor corrections are {corr}")
+        print(f"the period {period} factor corrections are {corr.label}")
 
 
 from nautilus_trader.indicators.zscore import Zscore
