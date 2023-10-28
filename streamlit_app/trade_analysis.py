@@ -2,6 +2,7 @@ from datetime import datetime
 import streamlit as st
 from streamlit_lightweight_charts import renderLightweightCharts
 import polars as pl 
+import pandas as pd 
 from io_tool import load_parquet,load_csv
 from data_scheme import bar_schema,schema_dict
 from stream2batch import batch_zizag
@@ -31,8 +32,8 @@ if __name__ == "__main__":
                 )
                 trades = trades.with_columns(
                     [
-                        pl.col("ts_opened").apply(lambda x:datetime.fromisoformat(x).timestamp()),
-                        pl.col("ts_closed").apply(lambda x:datetime.fromisoformat(x).timestamp())
+                        pl.col("ts_opened").map_elements(lambda x:pd.Timestamp(x).timestamp()),
+                        pl.col("ts_closed").map_elements(lambda x:pd.Timestamp(x).timestamp())
                     ]
                 )
                 kline_options = get_kline_plot_setting(df)

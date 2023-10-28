@@ -19,16 +19,21 @@ from nautilus_trader.model.data.bar cimport Bar
 
 
 cdef class OrderFlowBar(Bar):
-    cdef double imbalance_pressure_price
-    cdef double imbalance_support_price
-    cdef int pressure_levels
-    cdef int support_levels
-    cdef double point_of_control
-    cdef double top_imbalance_level1
-    cdef double top_imbalance_level2
-    cdef double bottom_imbalance_level1
-    cdef double bottom_imbalance_level2
-    cdef double delta
+
+    cdef int     pressure_levels 
+    cdef int     support_levels 
+    cdef double  bottom_imbalance 
+    cdef double  bottom_imbalance_price 
+    cdef double  middle_imbalance 
+    cdef double  middle_imbalance_price 
+    cdef double  top_imbalance 
+    cdef double  top_imbalance_price 
+    cdef double  point_of_control 
+    cdef double  poc_imbalance    
+    cdef double  delta 
+    cdef double  value_delta 
+    cdef bint    up_bar
+    cdef int     tag
 
 
     @staticmethod

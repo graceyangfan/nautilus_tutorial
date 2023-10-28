@@ -32,16 +32,20 @@ cdef class OrderFlowBar(Bar):
             Price low not None,
             Price close not None,
             Quantity volume not None,
-            double imbalance_pressure_price,
-            double imbalance_support_price,
             int pressure_levels,
             int support_levels,
+            double bottom_imbalance,
+            double bottom_imbalance_price,
+            double middle_imbalance,
+            double middle_imbalance_price,
+            double top_imbalance,
+            double top_imbalance_price,
             double point_of_control,
-            double top_imbalance_level1,
-            double top_imbalance_level2,
-            double bottom_imbalance_level1,
-            double bottom_imbalance_level2,
+            double poc_imbalance,
             double delta,
+            double value_delta,
+            bint up_bar,
+            int tag,
             uint64_t ts_event,
             uint64_t ts_init,
         ):
@@ -56,30 +60,38 @@ cdef class OrderFlowBar(Bar):
                 ts_init=ts_init,
             )
 
-            self.imbalance_pressure_price = imbalance_pressure_price
-            self.imbalance_support_price = imbalance_support_price
-            self.pressure_levels = pressure_levels 
-            self.support_levels = support_levels 
+            self.pressure_levels = pressure_levels
+            self.support_levels = support_levels
+            self.bottom_imbalance = bottom_imbalance
+            self.bottom_imbalance_price  = bottom_imbalance_price 
+            self.middle_imbalance = middle_imbalance 
+            self.middle_imbalance_price = middle_imbalance_price 
+            self.top_imbalance = top_imbalance 
+            self.top_imbalance_price = top_imbalance_price
             self.point_of_control = point_of_control 
-            self.top_imbalance_level1 = top_imbalance_level1
-            self.top_imbalance_level2 = top_imbalance_level2 
-            self.bottom_imbalance_level1 = bottom_imbalance_level1
-            self.bottom_imbalance_level2  = bottom_imbalance_level2 
+            self.poc_imbalance = poc_imbalance
             self.delta = delta 
+            self.value_delta = value_delta
+            self.up_bar = up_bar 
+            self.tag = tag 
 
     def __getstate__(self):
         return (
             *super().__getstate__(),
-            str(self.imbalance_pressure_price),
-            str(self.imbalance_support_price),
             str(self.pressure_levels),
             str(self.support_levels),
+            str(self.bottom_imbalance),
+            str(self.bottom_imbalance_price),
+            str(self.middle_imbalance),
+            str(self.middle_imbalance_price),
+            str(self.top_imbalance),
+            str(self.top_imbalance_price),
             str(self.point_of_control),
-            str(self.top_imbalance_level1),
-            str(self.top_imbalance_level2),
-            str(self.bottom_imbalance_level1),
-            str(self.bottom_imbalance_level2),
-            str(self.delta)
+            str(self.poc_imbalance),
+            str(self.delta),
+            str(self.value_delta),
+            str(self.up_bar),
+            str(self.tag)
         )
 
     def __setstate__(self, state):
@@ -95,16 +107,20 @@ cdef class OrderFlowBar(Bar):
             f"low={self.low}, "
             f"close={self.close}, "
             f"volume={self.volume}, "
-            f"imbalance_pressure_price={self.imbalance_pressure_price}, "
-            f"imbalance_support_price={self.imbalance_support_price}, "
             f"pressure_levels={self.pressure_levels}, "
             f"support_levels={self.support_levels}, "
+            f"bottom_imbalance={self.bottom_imbalance}, "
+            f"bottom_imbalance_price={self.bottom_imbalance_price}, "
+            f"middle_imbalance={self.middle_imbalance}, "
+            f"middle_imbalance_price={self.middle_imbalance_price}, "
+            f"top_imbalance={self.top_imbalance}, "
+            f"top_imbalance_price={self.top_imbalance_price}, "
             f"point_of_control={self.point_of_control}, "
-            f"top_imbalance_level1={self.top_imbalance_level1}, "
-            f"top_imbalance_level2={self.top_imbalance_level2}, "
-            f"bottom_imbalance_level1={self.bottom_imbalance_level1}, "
-            f"bottom_imbalance_level2={self.bottom_imbalance_level2}, "
+            f"poc_imbalance={self.poc_imbalance}, "
             f"delta={self.delta}, "
+            f"delta={self.value_delta}, "
+            f"up_bar={self.up_bar}, "
+            f"tag={self.tag}, "
             f"ts_event={self.ts_event}, "
             f"ts_init={self.ts_init})"
         )
@@ -119,16 +135,20 @@ cdef class OrderFlowBar(Bar):
                 "low": pa.string(),
                 "close": pa.string(),
                 "volume": pa.string(),
-                "imbalance_pressure_price": pa.float64(),
-                "imbalance_support_price": pa.float64(),
                 "pressure_levels": pa.uint64(),
-                "support_levels":  pa.uint64(),
+                "support_levels": pa.uint64(),
+                "bottom_imbalance": pa.float64(),
+                "bottom_imbalance_price": pa.float64(),
+                "middle_imbalance": pa.float64(),
+                "middle_imbalance_price": pa.float64(),
+                "top_imbalance": pa.float64(),
+                "top_imbalance_price": pa.float64(),
                 "point_of_control": pa.float64(),
-                "top_imbalance_level1": pa.float64(),
-                "top_imbalance_level2": pa.float64(),
-                "bottom_imbalance_level1": pa.float64(),
-                "bottom_imbalance_level2": pa.float64(),
+                "poc_imbalance": pa.float64(),
                 "delta":pa.float64(),
+                "value_delta":pa.float64(),
+                "up_bar":pa.bool_(),
+                "tag":pa.uint64(),
                 "ts_event": pa.uint64(),
                 "ts_init": pa.uint64(),
             },
@@ -160,16 +180,20 @@ cdef class OrderFlowBar(Bar):
             low=Price.from_str(values["low"]),
             close=Price.from_str(values["close"]),
             volume=Quantity.from_str(values["volume"]),
-            imbalance_pressure_price=values["imbalance_pressure_price"],
-            imbalance_support_price=values["imbalance_support_price"],
             pressure_levels=values["pressure_levels"],
             support_levels=values["support_levels"],
-            point_of_control=values["point_of_control"],
-            top_imbalance_level1=values["top_imbalance_level1"],
-            top_imbalance_level2=values["top_imbalance_level2"], 
-            bottom_imbalance_level1=values["bottom_imbalance_level1"],
-            bottom_imbalance_level2=values["bottom_imbalance_level2"],
+            bottom_imbalance=values["bottom_imbalance"],
+            bottom_imbalance_price=values["bottom_imbalance_price"],
+            middle_imbalance=values["middle_imbalance"],
+            middle_imbalance_price=values["middle_imbalance_price"],
+            top_imbalance=values["top_imbalance"],
+            top_imbalance_price=values["top_imbalance_price"],
+            point_of_control=values["point_of_control"], 
+            poc_imbalance=values["poc_imbalance"],
             delta=values["delta"],
+            value_delta=values["value_delta"],
+            up_bar=values["up_bar"],
+            tag=values["tag"],
             ts_event=values["ts_event"],
             ts_init=values["ts_init"],
         )
@@ -193,16 +217,20 @@ cdef class OrderFlowBar(Bar):
             "low": str(obj.low),
             "close": str(obj.close),
             "volume": str(obj.volume),
-            "imbalance_pressure_price": obj.imbalance_pressure_price,
-            "imbalance_support_price": obj.imbalance_support_price,
             "pressure_levels": obj.pressure_levels,
             "support_levels": obj.support_levels,
+            "bottom_imbalance": obj.bottom_imbalance,
+            "bottom_imbalance_price": obj.bottom_imbalance_price,
+            "middle_imbalance": obj.middle_imbalance,
+            "middle_imbalance_price": obj.middle_imbalance_price,
+            "top_imbalance": obj.top_imbalance,
+            "top_imbalance_price": obj.top_imbalance_price,
             "point_of_control": obj.point_of_control,
-            "top_imbalance_level1": obj.top_imbalance_level1,
-            "top_imbalance_level2": obj.top_imbalance_level2,
-            "bottom_imbalance_level1": obj.bottom_imbalance_level1,
-            "bottom_imbalance_level2": obj.bottom_imbalance_level2,
+            "poc_imbalance": obj.poc_imbalance,
             "delta":obj.delta,
+            "value_delta":obj.value_delta,
+            "up_bar":obj.up_bar,
+            "tag":obj.tag,
             "ts_event": obj.ts_event,
             "ts_init": obj.ts_event,
         }
@@ -237,37 +265,13 @@ cdef class OrderFlowBar(Bar):
         return OrderFlowBar.to_dict_c(obj)
 
     @property
-    def imbalance_pressure_price(self) -> double:
-        """
-        Return the imbalance_pressure_price.
-
-        Returns
-        -------
-        double
-
-        """
-        return self.imbalance_pressure_price
-
-    @property
-    def imbalance_support_price(self) -> double:
-        """
-        Return the imbalance_support_price.
-
-        Returns
-        -------
-        double
-
-        """
-        return self.imbalance_support_price
-
-    @property
     def pressure_levels(self) -> int:
         """
         Return the pressure_levels.
 
         Returns
         -------
-        double
+        int
 
         """
         return self.pressure_levels
@@ -279,10 +283,82 @@ cdef class OrderFlowBar(Bar):
 
         Returns
         -------
-        double
+        int
 
         """
         return self.support_levels
+
+    @property
+    def bottom_imbalance(self) -> double:
+        """
+        Return the bottom_imbalance.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.bottom_imbalance
+
+    @property
+    def bottom_imbalance_price (self) -> double:
+        """
+        Return the bottom_imbalance_price .
+
+        Returns
+        -------
+        double
+
+        """
+        return self.bottom_imbalance_price 
+
+    @property
+    def middle_imbalance(self) -> double:
+        """
+        Return the middle_imbalance.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.middle_imbalance
+
+    @property
+    def middle_imbalance_price(self) -> double:
+        """
+        Return the middle_imbalance_price.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.middle_imbalance_price
+
+    @property
+    def top_imbalance(self) -> double:
+        """
+        Return the top_imbalance.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.top_imbalance
+
+    @property
+    def top_imbalance_price(self) -> double:
+        """
+        Return the top_imbalance_price.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.top_imbalance_price
 
     @property
     def point_of_control(self) -> double:
@@ -297,52 +373,16 @@ cdef class OrderFlowBar(Bar):
         return self.point_of_control
 
     @property
-    def top_imbalance_level1(self) -> double:
+    def poc_imbalance(self) -> double:
         """
-        Return the top_imbalance_level1.
+        Return the poc_imbalance.
 
         Returns
         -------
         double
 
         """
-        return self.top_imbalance_level1
-
-    @property
-    def top_imbalance_level2(self) -> double:
-        """
-        Return the top_imbalance_level2.
-
-        Returns
-        -------
-        double
-
-        """
-        return self.top_imbalance_level2
-
-    @property
-    def bottom_imbalance_level1(self) -> double:
-        """
-        Return the bottom_imbalance_level1.
-
-        Returns
-        -------
-        double
-
-        """
-        return self.bottom_imbalance_level1
-
-    @property
-    def bottom_imbalance_level2(self) -> double:
-        """
-        Return the bottom_imbalance_level2.
-
-        Returns
-        -------
-        double
-
-        """
-        return self.bottom_imbalance_level2
+        return self.poc_imbalance
 
     @property
     def delta(self) -> double:
@@ -355,4 +395,41 @@ cdef class OrderFlowBar(Bar):
 
         """
         return self.delta
+
+    @property
+    def value_delta(self) -> double:
+        """
+        Return the value_delta.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.value_delta
+
+    @property
+    def up_bar(self) -> bool:
+        """
+        Return the up_bar.
+
+        Returns
+        -------
+        bool
+
+        """
+        return self.up_bar
+
+
+    @property
+    def tag(self) -> int:
+        """
+        Return the tag.
+
+        Returns
+        -------
+        int
+
+        """
+        return self.tag
 
