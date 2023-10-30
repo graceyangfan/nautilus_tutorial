@@ -8,6 +8,7 @@ pub mod rollregression;
 pub mod kalmanfilter;
 pub mod orderblock;
 pub mod peak;
+pub mod ouprocess;
 
 use crate::entropy::Entropy;
 use crate::fracdiff::FracDiff;
@@ -17,6 +18,7 @@ use crate::rollregression::RollRegression;
 use crate::kalmanfilter::KalmanFilter;
 use crate::orderblock::OrderBlockDetector;
 use crate::peak::PeakDetector;
+use crate::ouprocess::OUProcessTransformer;
 
 
 
@@ -31,5 +33,6 @@ fn features(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<KalmanFilter>()?;
     m.add_class::<OrderBlockDetector>()?;
     m.add_class::<PeakDetector>()?;
+    m.add_class::<OUProcessTransformer>()?;
     Ok(())
 }
