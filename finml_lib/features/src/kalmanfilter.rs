@@ -51,7 +51,7 @@ impl KalmanFilter {
         self.initialized
     }
 
-    pub fn intercept(&self) -> f64 {
+    pub fn slope(&self) -> f64 {
         self.state_mean[(0,0)]
     }
 
@@ -80,8 +80,8 @@ mod tests {
         let mut state_means = Vec::new();
         for (x, y) in x.iter().zip(y.iter()) {
             kf.update_raw(*x, *y);
-            state_means.push(vec![kf.intercept(), kf.residual()]);
-            println!("intercept: {}, residual: {}", kf.intercept(), kf.residual());
+            state_means.push(vec![kf.slope(), kf.residual()]);
+            println!("slope: {}, residual: {}", kf.slope(), kf.residual());
         }
     }
 }

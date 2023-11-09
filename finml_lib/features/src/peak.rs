@@ -40,7 +40,6 @@ impl PeakDetector {
         self.high_array.push_back(high);
         self.low_array.push_back(low);
         self.indicate_array.push_back(indicate_value);
-        self.pop_front();
         if self.high_array.len() >= self.period
         {
             self.initialized = true;
@@ -65,6 +64,7 @@ impl PeakDetector {
                 self.peak_indicate_values.push_back(self.indicate_array[real_index]);
             }
         }
+        self.pop_front();
     }
 
 
