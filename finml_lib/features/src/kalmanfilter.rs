@@ -6,7 +6,7 @@ use nalgebra::SMatrix;
 #[derive(Debug)]
 pub struct KalmanFilter {
     state_mean: SMatrix<f64,2,1>, // state_mean for kalman filter,[beta1,beta0]^T (2,1)
-    y: SMatrix::<f64, 1, 1>, 
+    res: f64,
     q: f64,// moving noise 
     r: f64,//observe noise 
     k: SMatrix<f64,2,1>,//kalman gain 
@@ -17,11 +17,11 @@ pub struct KalmanFilter {
 #[pymethods]
 impl KalmanFilter {
     #[new]
-    #[args(q = "0.00001", r = "0.0001", p = "10000.0")]
+    #[args(q = "0.001", r = "0.0001", p = "10000.0")]
     pub fn new(q:f64, r:f64, p:f64) -> Self {
         Self {
             state_mean: SMatrix::<f64, 2, 1>::zeros(),
-            y: SMatrix::<f64, 1, 1>::zeros(),
+            res:0.0,
             q:q,
             r:r,
             k: SMatrix::<f64, 2, 1>::zeros(),
@@ -39,12 +39,13 @@ impl KalmanFilter {
         let p_pred = (f * self.p * f.transpose()).add_scalar(self.q);
         // Correct
         let h = SMatrix::<f64, 1, 2>::from_vec(vec![input_x,1.]);
-        self.y = (-h*x_pred).add_scalar(input_y);// Innovation
+        let y = (-h*x_pred).add_scalar(input_y);// Innovation
         //println!("{}", self.y);
         let s = (h * p_pred * h.transpose()).add_scalar(self.r); // Innovation covariance
         self.k = p_pred * h.transpose() * s.try_inverse().unwrap(); // Kalman gain 2*2*2*1*1 = (2,1)
-        self.state_mean = x_pred + self.k * self.y; // Updated state estimate (2,1)+(2,1) = (2,1)
+        self.state_mean = x_pred + self.k * y; // Updated state estimate (2,1)+(2,1) = (2,1)
         self.p = (SMatrix::<f64, 2, 2>::identity() - self.k * h) * p_pred; // Updated covariance estimate
+        self.res = input_y - self.slope()*input_x - self.intercept();
     }
 
     pub fn reset(&mut self) {
@@ -64,7 +65,7 @@ impl KalmanFilter {
     }
 
     pub fn residual(&self) -> f64 {
-        self.y[(0,0)]
+        self.res 
     }
 }
 
