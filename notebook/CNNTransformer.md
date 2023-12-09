@@ -25,7 +25,7 @@ The output shape is denoted as `(B, C_out, T_out)`, where:
 `T_out` is the length of the output sequence.
 
 Where T_out is compute as:
-$$T_{\text{out}} = \left\lfloor \frac{T_{\text{in}} + 2 \times \text{padding} -\text{dilation} \times (\text{kernel\_size} - 1) - 1}{\text{stride}} + 1 \right\rfloor$$
+\[ T_{\text{out}} = \left\lfloor \frac{T_{\text{in}} + 2 \times \text{padding} -\text{dilation} \times (\text{kernel\_size} - 1) - 1}{\text{stride}} + 1 \right\rfloor\]
 
 For the given `nn.Conv1d` layer:
 
