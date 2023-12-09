@@ -23,8 +23,9 @@ The output shape is denoted as `(B, C_out, T_out)`, where:
 `N` is the batch size (remains the same as input),
 `C_out` is the number of output channels, determined by the `out_channels` parameter in the `nn.Conv1d` layer,
 `T_out` is the length of the output sequence.
-    Where T_out is compute as:
-        $$T_{\text{out}} = \left\lfloor \frac{T_{\text{in}} + 2 \times \text{padding} - \text{dilation} \times (\text{kernel\_size} - 1) - 1}{\text{stride}} + 1 \right\rfloor$$
+
+Where T_out is compute as:
+$$T_{\text{out}} = \left\lfloor \frac{T_{\text{in}} + 2 \times \text{padding} -\text{dilation} \times (\text{kernel\_size} - 1) - 1}{\text{stride}} + 1 \right\rfloor$$
 
 For the given `nn.Conv1d` layer:
 
@@ -46,7 +47,7 @@ if filter_size is set as 2,the output sequence length is the input length plus 1
 
 ### `nn.InstanceNorm1d`:
 
-The [`nn.InstanceNorm1d`]（https://pytorch.org/docs/stable/generated/torch.nn.InstanceNorm1d.html）module in PyTorch is a powerful tool for performing instance normalization on 1-dimensional input tensors. Instance normalization is a technique commonly used to normalize the activations of each instance independently within a batch.You can take a look at [here](ttps://www.google.com/search?newwindow=1&sca_esv=589281839&q=instance+normalization&tbm=isch&source=lnms&sa=X&ved=2ahUKEwiisIPwoYGDAxU-wzgGHe6sAZUQ0pQJegQICxAB&biw=1087&bih=608&dpr=2.5#imgrc=zs74HRalT-JulM)
+The [`nn.InstanceNorm1d`](https://pytorch.org/docs/stable/generated/torch.nn.InstanceNorm1d.html)module in PyTorch is a powerful tool for performing instance normalization on 1-dimensional input tensors. Instance normalization is a technique commonly used to normalize the activations of each instance independently within a batch.You can take a look at [here](ttps://www.google.com/search?newwindow=1&sca_esv=589281839&q=instance+normalization&tbm=isch&source=lnms&sa=X&ved=2ahUKEwiisIPwoYGDAxU-wzgGHe6sAZUQ0pQJegQICxAB&biw=1087&bih=608&dpr=2.5#imgrc=zs74HRalT-JulM)
 
 
 For the given `nn.InstanceNorm1d` layer:
