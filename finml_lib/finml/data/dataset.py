@@ -155,6 +155,8 @@ class ReturnBasedDataset(Dataset):
 
     Note:
         If x_handler is provided, it will be used for preprocessing input features.
+        The shape of the processed input features (X) will be [batch_size, sequence_length, feature_dim].
+        The shape of returns will be [batch_size, assert_num].
     """
     def __init__(
         self, 
@@ -168,6 +170,9 @@ class ReturnBasedDataset(Dataset):
 
         self.save_prefix = save_prefix
         
+        # Ensure the lengths of X and returns are the same
+        assert len(X) == len(returns), "Lengths of X and returns must be the same."
+
         # Convert DataFrame to numpy array if necessary
         if isinstance(X, (pd.DataFrame, pd.Series)):
             X = X.values
@@ -180,28 +185,7 @@ class ReturnBasedDataset(Dataset):
         self.x_handler = x_handler
         self.transform()
 
-    def transform(self):
-        """
-        Apply preprocessing transformations to input features if a handler is provided.
-        Save the handler if not already fitted.
-        """
-        if self.x_handler:
-            if not self.x_handler.is_fitted():
-                self.X = self.x_handler.fit_transform(self.X)
-                # Save the handler for future use
-                with open(self.save_prefix + "_x.pkl", "wb") as f:
-                    pickle.dump(self.x_handler, f)
-            else:
-                self.X = self.x_handler.transform(self.X)
-
-    def __len__(self):
-        """
-        Get the length of the dataset.
-
-        Returns:
-            int: Length of the dataset.
-        """
-        return self.X.shape[0] - self.sequence_len + 1
+    # ...
 
     def __getitem__(self, idx):
         """
@@ -214,6 +198,6 @@ class ReturnBasedDataset(Dataset):
             tuple: Tuple containing input sequence and returns for asset allocation optimization.
         """
         x = torch.as_tensor(self.X[idx:idx + self.sequence_len], dtype=torch.float32)
-        #returns for asset allocation optimization
-        returns = torch.as_tensor(self.returns[idx:idx + self.sequence_len], dtype=torch.float32)
+        # Returns for asset allocation optimization
+        returns = torch.as_tensor(self.returns[idx + self.sequence_len - 1], dtype=torch.float32)
         return x, returns

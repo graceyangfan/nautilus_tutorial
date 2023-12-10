@@ -1,34 +1,87 @@
-from finml.models.CNNTransformer.models import CNNTransformer
-from finml.data.datamodule import ReturnBasedDataModule 
-from finml.evaluation.cross_validation import PurgedKFold 
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning import seed_everything, Trainer
-from finml.data.handler import StandardNorm
+import os
+import pickle
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
-import polars as pl 
-import os 
-import pickle 
+import polars as pl
+
+from pytorch_lightning import seed_everything, Trainer
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+
+from finml.models.CNNTransformer.models import CNNTransformer
+from finml.data.datamodule import ReturnBasedDataModule
+from finml.evaluation.cross_validation import PurgedKFold
+from finml.data.handler import StandardNorms
+
 
 def define_args():
     """
     Define the arguments for the training process.
 
     Returns:
-        Namespace: A namespace containing model configuration parameters.
+        SimpleNamespace: A namespace containing model configuration parameters.
     """
-    args = Namespace(
-        n_splits=5,  # Example value, replace with your actual value
-        embargo_pct=0.1,  # Example value, replace with your actual value
-        patience=3,  # Example value, replace with your actual value
-        max_epochs=10,  # Example value, replace with your actual value
-        gpus=1,  # Example value, replace with your actual value
-        tpus=0,  # Example value, replace with your actual value
-        sequence_len=30,  # Example value, replace with your actual value
-        x_handler=StandardNorm(),  # Example value, replace with your actual handler
-        save_prefix='model_checkpoints/',  # Example value, replace with your actual value
-        batch_size=64,  # Example value, replace with your actual value
-        num_workers=4  # Example value, replace with your actual value
+    args = SimpleNamespace(
+        # Number of splits for purged cross-validation
+        n_splits=5,
+
+        # Percentage of embargo for purged cross-validation
+        embargo_pct=0.1,
+
+        # Patience for early stopping
+        patience=3,
+
+        # Maximum number of epochs for training
+        max_epochs=10,
+
+        # Length of input sequences
+        sequence_len=30,
+
+        # Handler for preprocessing input features
+        x_handler=StandardNorm(),
+
+        # Path to save PyTorch Lightning model checkpoints
+        save_path='model_checkpoints/',
+
+        # Prefix for saving preprocessing handler
+        save_prefix='model_checkpoints/scaler',
+
+        # Batch size for training
+        batch_size=64,
+
+        # Number of workers for data loading
+        num_workers=4,
+
+        # Number of filters in each CNN block
+        filter_numbers=[2, 8],
+
+        # Factor to determine the number of hidden units in the Transformer Encoder
+        hidden_units_factor=2,
+
+        # Whether to use normalization in the CNN blocks
+        use_normalization=True,
+
+        # Size of the filters in the CNN blocks
+        filter_size=2,
+
+        # Number of attention heads in the Transformer Encoder
+        attention_heads=4,
+
+        # Dropout rate in the Transformer Encoder
+        dropout=0.25,
+
+        # Dimensionality of the final output
+        output_dim=2,
+
+        # Transaction cost ratio for the Sharpe ratio loss
+        trans_cost_ratio=0.0005,
+
+        # Holding cost ratio for the Sharpe ratio loss
+        hold_cost_ratio=0.0001,
+
+        # Learning rate for the optimizer
+        learning_rate=1e-3
     )
     return args
 
@@ -40,7 +93,7 @@ def train_folds(X, returns, event_times, args):
         X (pl.DataFrame): Input features as a Polars DataFrame.
         returns (pl.DataFrame): Returns for asset allocation optimization as a Polars DataFrame.
         event_times (pl.DataFrame): Event times for purged cross-validation as a Polars DataFrame.
-        args (Namespace): A namespace containing model configuration parameters.
+        args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
         None
@@ -50,7 +103,7 @@ def train_folds(X, returns, event_times, args):
         X = X.to_pandas()
     if isinstance(returns, pl.DataFrame):
         returns = returns.to_pandas()
-    if not isinstance(event_times, pd.DataFrame):
+    if not isinstance(event_times, pl.DataFrame):
         event_times = pl.from_pandas(event_times)
 
     seed_everything(42) 
@@ -90,10 +143,10 @@ def train_folds(X, returns, event_times, args):
         # Set up trainer with callbacks
         trainer = Trainer(
             max_epochs=args.max_epochs,
-            gpus=args.gpus,
-            tpus=args.tpus,
-            callbacks=[early_stop_callback, checkpoint_callback],
-            progress_bar_refresh_rate=0
+            accelerator="auto", 
+            devices="auto", 
+            strategy="auto",
+            callbacks=[early_stop_callback, checkpoint_callback]
         )
 
         # Use loc to obtain training and validation sets
@@ -129,7 +182,7 @@ def load_model(model_path, args):
 
     Args:
         model_path (str): Path to the saved PyTorch Lightning model.
-        args (Namespace): A namespace containing model configuration parameters.
+        args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
         CNNTransformer: Loaded CNNTransformer model.
@@ -171,7 +224,7 @@ def predict_single_input(model, input_data, x_handler, args):
         model (CNNTransformer): Trained CNNTransformer model.
         input_data (numpy.ndarray): Single input data as a NumPy array.
         x_handler (object): Loaded x_handler.
-        args (Namespace): A namespace containing model configuration parameters.
+        args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
         numpy.ndarray: Model predictions for the single input.

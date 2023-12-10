@@ -20,6 +20,7 @@ class SharpeLoss(object):
             trans_cost_ratio (float): Ratio for transaction cost penalty.
             hold_cost_ratio (float): Ratio for holding cost penalty.
         """
+        super().__init__()
         self.trans_cost_ratio = trans_cost_ratio
         self.hold_cost_ratio = hold_cost_ratio
 
@@ -77,6 +78,7 @@ class CNN_Block(nn.Module):
         Shape of input and output tensors both looks like: [batch_size, feature_dim, sequence_length]
         """
         # Ensure that out_dim is a multiple of in_dim
+        super().__init__()
         assert out_dim % in_dim == 0
         
         # Store the parameters as attributes
@@ -90,13 +92,13 @@ class CNN_Block(nn.Module):
             in_channels=in_dim,
             out_channels=out_dim,
             kernel_size=filter_size,
-            padding_mode="same"
+            padding="same"
         )
         self.conv2 = nn.Conv1d(
             in_channels=out_dim,
             out_channels=out_dim,
             kernel_size=filter_size,
-            padding_mode="same"
+            padding="same"
         )
         
         # Rectified Linear Unit (ReLU) activation function
@@ -108,9 +110,13 @@ class CNN_Block(nn.Module):
 
     def forward(self, x):
         '''
-        The input data and output data shape both looks like [batch_size, feature_dim, sequence_length]
+        The input data  shape looks like [batch_size, sequence_length, feature_dim]
+        The output data shape looks like [batch_size, feature_dim, sequence_length]
         '''
         # Apply instance normalization if specified
+
+        # [batch_size, sequence_length, feature_dim] => [batch_size, feature_dim, sequence_length]
+        x = x.permute(0,2,1)
         if self.use_normalization:
             x = self.normalization1(x)
         

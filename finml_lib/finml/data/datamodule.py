@@ -48,7 +48,7 @@ class SingleValueLabelDataModule(LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.valid_datset
+            self.valid_datset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
