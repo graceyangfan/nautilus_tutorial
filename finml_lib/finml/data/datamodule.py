@@ -1,122 +1,143 @@
-from finml.models.CNNTransformer.models import CNNTransformer
-from finml.data.datamodule import ReturnBasedDataModule 
-from finml.evaluation.cross_validation import PurgedKFold 
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning import seed_everything, Trainer
-from finml.data.handler import StandardNorm
-import numpy as np
 import pandas as pd
-import polars as pl 
+import torch
+from torch.utils.data import DataLoader
+from pytorch_lightning import LightningDataModule
+from finml.data.dataset import SingleValueLabelDataset,ReturnBasedDataset
 
-def define_args():
-    """
-    Define the arguments for the training process.
 
-    Returns:
-        Namespace: A namespace containing model configuration parameters.
-    """
-    args = Namespace(
-        n_splits=5,  # Example value, replace with your actual value
-        embargo_pct=0.1,  # Example value, replace with your actual value
-        patience=3,  # Example value, replace with your actual value
-        max_epochs=10,  # Example value, replace with your actual value
-        gpus=1,  # Example value, replace with your actual value
-        tpus=0,  # Example value, replace with your actual value
-        sequence_len=30,  # Example value, replace with your actual value
-        x_handler=StandardNorm(),  # Example value, replace with your actual handler
-        save_path='model_checkpoints/',  # Example value, replace with your actual value
-        save_prefix='model_checkpoints/scaler',  # Example value, replace with your actual value
-        batch_size=64,  # Example value, replace with your actual value
-        num_workers=4  # Example value, replace with your actual value
-    )
-    return args
+class SingleValueLabelDataModule(LightningDataModule):
+    def __init__(
+        self,
+        x_train,
+        y_train,
+        x_test,
+        y_test,
+        x_handler = None,
+        y_handler = None,
+        is_classification = True,
+        batch_size = 64,
+        num_workers = 4
+    ):
+        super().__init__()
+        self.batch_size = batch_size 
+        self.num_workers = num_workers 
+        self.train_dataset = SingleValueLabelDataset(
+            x_train,
+            y_train,
+            x_handler,
+            y_handler,
+            is_classification
+        )
+        self.train_dataset.transform()
+        self.valid_datset = SingleValueLabelDataset(
+            x_test,
+            y_test,
+            x_handler,
+            y_handler,
+            is_classification
+        )
+        self.valid_datset.transform() 
 
-def train_folds(X, returns, event_times, args):
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.valid_datset
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+class ReturnBasedDataModule(LightningDataModule):
     """
-    Train a CNNTransformer model using purged cross-validation with early stopping.
+    Lightning DataModule for handling datasets with input features and returns.
 
     Args:
-        X (pl.DataFrame): Input features as a Polars DataFrame.
-        returns (pl.DataFrame): Returns for asset allocation optimization as a Polars DataFrame.
-        event_times (pl.DataFrame): Event times for purged cross-validation as a Polars DataFrame.
-        args (Namespace): A namespace containing model configuration parameters.
+        x_train (array-like or DataFrame): Training input features.
+        returns_train (array-like or DataFrame): Training returns for asset allocation optimization.
+        x_test (array-like or DataFrame): Validation input features.
+        returns_test (array-like or DataFrame): Validation returns for asset allocation optimization.
+        sequence_len (int): Length of sequences to be used.
+        x_handler (object): An optional handler for preprocessing input features.
+        save_prefix (str): Prefix for saving the preprocessing handler.
+        batch_size (int): Batch size for DataLoader.
+        num_workers (int): Number of workers for DataLoader.
 
-    Returns:
-        None
+    Attributes:
+        batch_size (int): Batch size for DataLoader.
+        num_workers (int): Number of workers for DataLoader.
+        train_dataset (ReturnBasedDataset): Training dataset instance.
+        valid_dataset (ReturnBasedDataset): Validation dataset instance.
+
+    Note:
+        If x_handler is provided, it will be used for preprocessing input features.
     """
-    # Convert DataFrames to pandas if needed
-    if isinstance(X, pl.DataFrame):
-        X = X.to_pandas()
-    if isinstance(returns, pl.DataFrame):
-        returns = returns.to_pandas()
-    if not isinstance(event_times, pd.DataFrame):
-        event_times = pl.from_pandas(event_times)
-
-    seed_everything(42) 
-
-    # Initialize PurgedKFold with specified parameters
-    purged_kfold = PurgedKFold(
-        n_splits=args.n_splits,
-        embargo_pct=args.embargo_pct
-    )
-
-    # List to store validation losses for each fold
-    val_losses = []
-
-    # Iterate through folds
-    for fold, (train_indices, val_indices) in enumerate(purged_kfold.split(event_times)):
-        print(f"Fold {fold + 1}")
-
-        # Create a new model instance for each fold
-        fold_model = CNNTransformer(args)
-
-        # Set up early stopping callback
-        early_stop_callback = EarlyStopping(
-            monitor='val_loss',
-            patience=args.patience,
-            verbose=True,
-            mode='min'
-        )
-
-        # Set up model checkpoint callback
-        checkpoint_callback = ModelCheckpoint(
-            monitor='val_loss',
-            mode='min',
-            dirpath=args.save_path,
-            filename=f'model_fold_{fold + 1}'  # You can customize the filename pattern
-        )
-
-        # Set up trainer with callbacks
-        trainer = Trainer(
-            max_epochs=args.max_epochs,
-            gpus=args.gpus,
-            tpus=args.tpus,
-            callbacks=[early_stop_callback, checkpoint_callback],
-            progress_bar_refresh_rate=0
-        )
-
-        # Use loc to obtain training and validation sets
-        x_train, x_test = X.loc[train_indices], X.loc[val_indices]
-        returns_train, returns_test = returns.loc[train_indices], returns.loc[val_indices]
+    def __init__(
+        self,
+        x_train,
+        returns_train,
+        x_test,
+        returns_test,
+        sequence_len=30,
+        x_handler=None,
+        save_prefix="scaler",
+        batch_size=64,
+        num_workers=4
+    ):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_workers = num_workers
 
         # Create and transform training dataset
-        data_module = ReturnBasedDataModule(
-            x_train=x_train,
-            returns_train=returns_train,
-            x_test=x_test,
-            returns_test=returns_test,
-            sequence_len=args.sequence_len,
-            x_handler=args.x_handler,
-            save_prefix=args.save_prefix,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers
+        self.train_dataset = ReturnBasedDataset(
+            X=x_train,
+            returns=returns_train,
+            sequence_len=sequence_len,
+            x_handler=x_handler,
+            save_prefix=save_prefix
+        )
+        self.train_dataset.transform()
+
+        # Create and transform validation dataset
+        self.valid_dataset = ReturnBasedDataset(
+            X=x_test,
+            returns=returns_test,
+            sequence_len=sequence_len,
+            x_handler=x_handler,
+            save_prefix=save_prefix
+        )
+        self.valid_dataset.transform()
+
+    def train_dataloader(self):
+        """
+        Create DataLoader for the training dataset.
+
+        Returns:
+            DataLoader: DataLoader for the training dataset.
+        """
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,  # Do not shuffle time series data
+            num_workers=self.num_workers
         )
 
-        # Train the model on the current fold
-        trainer.fit(fold_model, data_module)
+    def val_dataloader(self):
+        """
+        Create DataLoader for the validation dataset.
 
-        # Append the validation loss for this fold to the list
-        val_losses.append(early_stop_callback.best_score)
-
-    mean_val_loss = np.mean(val_losses)
-    print(f'The average val_loss on {args.n_splits} models is {mean_val_loss}')
+        Returns:
+            DataLoader: DataLoader for the validation dataset.
+        """
+        return DataLoader(
+            self.valid_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,  # Do not shuffle time series data
+            num_workers=self.num_workers
+        )
