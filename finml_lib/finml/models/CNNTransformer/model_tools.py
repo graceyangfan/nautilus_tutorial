@@ -7,6 +7,8 @@ from finml.data.handler import StandardNorm
 import numpy as np
 import pandas as pd
 import polars as pl 
+import os 
+import pickle 
 
 def define_args():
     """
@@ -24,8 +26,7 @@ def define_args():
         tpus=0,  # Example value, replace with your actual value
         sequence_len=30,  # Example value, replace with your actual value
         x_handler=StandardNorm(),  # Example value, replace with your actual handler
-        save_path='model_checkpoints/',  # Example value, replace with your actual value
-        save_prefix='model_checkpoints/scaler',  # Example value, replace with your actual value
+        save_prefix='model_checkpoints/',  # Example value, replace with your actual value
         batch_size=64,  # Example value, replace with your actual value
         num_workers=4  # Example value, replace with your actual value
     )
@@ -82,7 +83,7 @@ def train_folds(X, returns, event_times, args):
         checkpoint_callback = ModelCheckpoint(
             monitor='val_loss',
             mode='min',
-            dirpath=args.save_path,
+            dirpath=args.save_prefix,
             filename=f'model_fold_{fold + 1}'  # You can customize the filename pattern
         )
 
@@ -120,3 +121,78 @@ def train_folds(X, returns, event_times, args):
 
     mean_val_loss = np.mean(val_losses)
     print(f'The average val_loss on {args.n_splits} models is {mean_val_loss}')
+
+
+def load_model(model_path, args):
+    """
+    Load a trained CNNTransformer model.
+
+    Args:
+        model_path (str): Path to the saved PyTorch Lightning model.
+        args (Namespace): A namespace containing model configuration parameters.
+
+    Returns:
+        CNNTransformer: Loaded CNNTransformer model.
+    """
+    # Create a new model instance
+    model = CNNTransformer(args)
+
+    # Load the trained weights
+    model.load_state_dict(torch.load(model_path))
+
+    # Move the model to the CPU
+    model.to("cpu")
+
+    return model
+
+def load_x_handler(filename_prefix):
+    """
+    Load the x_handler from a saved file.
+
+    Args:
+        filename_prefix (str): Prefix for the filename where x_handler is saved.
+
+    Returns:
+        object: Loaded x_handler.
+    """
+    x_handler_path = filename_prefix + "_x.pkl"
+    if os.path.exists(x_handler_path):
+        x_handler = pickle.load(open(x_handler_path, "rb"))
+        x_handler.fitted = True
+        return x_handler
+    else:
+        raise FileNotFoundError(f"x_handler file not found: {x_handler_path}")
+
+def predict_single_input(model, input_data, x_handler, args):
+    """
+    Make predictions on a single input using a trained CNNTransformer model.
+
+    Args:
+        model (CNNTransformer): Trained CNNTransformer model.
+        input_data (numpy.ndarray): Single input data as a NumPy array.
+        x_handler (object): Loaded x_handler.
+        args (Namespace): A namespace containing model configuration parameters.
+
+    Returns:
+        numpy.ndarray: Model predictions for the single input.
+    """
+    # Transform input data using the loaded x_handler
+    if x_handler is not None:
+        if not x_handler.fitted:
+            input_data = x_handler.fit_transform(input_data)
+        else:
+            input_data = x_handler.transform(input_data)
+
+    # Convert input_data to torch tensor and move to CPU
+    input_tensor = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0).to("cpu")
+
+    # Set the model in evaluation mode and move to CPU
+    model.eval()
+    model.to("cpu")
+
+    # Make predictions on the single input
+    with torch.no_grad():
+        predictions = model(input_tensor).numpy()
+
+    return predictions
+
