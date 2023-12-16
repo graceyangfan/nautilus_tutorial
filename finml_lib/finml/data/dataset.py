@@ -185,7 +185,27 @@ class ReturnBasedDataset(Dataset):
         self.x_handler = x_handler
         self.transform()
 
-    # ...
+    def transform(self):
+        """
+        Apply preprocessing transformations to input features if a handler is provided.
+        Save the handler if not already fitted.
+        """
+        if self.x_handler:
+            if not self.x_handler.is_fitted():
+                self.X = self.x_handler.fit_transform(self.X)
+                # Save the handler for future use
+                with open(self.save_prefix + "_x.pkl", "wb") as f:
+                    pickle.dump(self.x_handler, f)
+            else:
+                self.X = self.x_handler.transform(self.X)
+
+    def __len__(self):
+        """
+        Get the length of the dataset.
+        Returns:
+            int: Length of the dataset.
+        """
+        return self.X.shape[0] - self.sequence_len + 1
 
     def __getitem__(self, idx):
         """

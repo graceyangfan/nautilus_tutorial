@@ -35,21 +35,15 @@ class SharpeLoss(object):
         Returns:
             torch.Tensor: Negative mean of final returns divided by standard deviation.
         """
-        abs_weight_sum = torch.sum(torch.abs(weight_pred), axis=1, keepdim=True)
-        
-        try:
-            normed_weight = weight_pred / abs_weight_sum
-        except:
-            normed_weight = weight_pred / (abs_weight_sum + 1e-8)
 
-        final_returns = torch.sum(return_data * normed_weight) - \
+        final_returns = torch.sum(return_data * weight_pred) - \
             self.trans_cost_ratio * torch.cat((
                 torch.zeros(1, device=weight_pred.device),
-                torch.sum(torch.abs(normed_weight[1:] - normed_weight[:-1]), axis=1)
-            )) - self.hold_cost_ratio * torch.sum(torch.abs(normed_weight), axis=1)
+                torch.sum(torch.abs(weight_pred[1:] - weight_pred[:-1]), axis=1)
+            )) - self.hold_cost_ratio * torch.sum(torch.abs(weight_pred), axis=1)
 
         # Minimize the negative mean of final returns divided by standard deviation
-        return -torch.mean(final_returns) / torch.std(final_returns)
+        return -torch.mean(final_returns) / (torch.std(final_returns)+1e-8)
 
 
 class CNN_Block(nn.Module):
@@ -110,13 +104,11 @@ class CNN_Block(nn.Module):
 
     def forward(self, x):
         '''
-        The input data  shape looks like [batch_size, sequence_length, feature_dim]
+        The input data  shape looks like [batch_size, feature_dim, sequence_length]
         The output data shape looks like [batch_size, feature_dim, sequence_length]
         '''
         # Apply instance normalization if specified
 
-        # [batch_size, sequence_length, feature_dim] => [batch_size, feature_dim, sequence_length]
-        x = x.permute(0,2,1)
         if self.use_normalization:
             x = self.normalization1(x)
         
@@ -158,6 +150,7 @@ class CNNTransformer(pl.LightningModule):
             - trans_cost_ratio (float): Ratio for transaction cost in the SharpeLoss.
             - hold_cost_ratio (float): Ratio for holding cost in the SharpeLoss.
             - learning_rate (float): Learning rate for the optimizer.
+            - limit_for_pair_trading (bool): Whether to use a limit for pair trading.
 
         Note:
             The input data shape should be [batch_size, feature_dim, sequence_length].
@@ -165,6 +158,9 @@ class CNNTransformer(pl.LightningModule):
         super(CNNTransformer, self).__init__()
         self.args = args
         self.save_hyperparameters()
+
+        # Limit for pair trading
+        self.limit_for_pair_trading = args.limit_for_pair_trading
 
         # Extract configuration parameters
         self.filter_numbers = args.filter_numbers
@@ -184,6 +180,8 @@ class CNNTransformer(pl.LightningModule):
                 )
             )
 
+        assert args.filter_numbers[-1] % args.attention_heads == 0
+
         # Create Transformer Encoder layer
         self.encoder = nn.TransformerEncoderLayer(
             d_model=args.filter_numbers[-1],
@@ -194,21 +192,28 @@ class CNNTransformer(pl.LightningModule):
         )
 
         # Linear layer for final output
-        self.linear = nn.Linear(args.filter_numbers[-1], args.output_dim)
+        if self.limit_for_pair_trading:
+            self.linear = nn.Linear(args.filter_numbers[-1], 1)
+        else:
+            self.linear = nn.Linear(args.filter_numbers[-1], args.output_dim)
+        self.tanh = nn.Tanh()
 
         # SharpeLoss for training
         self.loss = SharpeLoss(args.trans_cost_ratio, args.hold_cost_ratio)
+
 
     def forward(self, x):
         """
         Forward pass of the CNNTransformer model.
 
         Args:
-            x (torch.Tensor): Input tensor with shape [batch_size, feature_dim, sequence_length].
+            x (torch.Tensor): Input tensor with shape [batch_size, sequence_length, feature_dim].
 
         Returns:
             torch.Tensor: Output tensor after passing through the model.
         """
+        # [batch_size, sequence_length, feature_dim] => [batch_size, feature_dim, sequence_length]
+        x = x.permute(0,2,1)
         # Apply CNN blocks
         for block in self.convBlocks:
             x = block(x)
@@ -219,8 +224,13 @@ class CNNTransformer(pl.LightningModule):
         # Apply Transformer Encoder
         x = self.encoder(x)
 
-        # Return the output after applying the linear layer
-        return self.linear(x[:, -1, :])
+        weight = self.tanh(self.linear(x[:, -1, :]))
+    
+        if self.limit_for_pair_trading:
+            #limit weight similar to [w,-w]
+            return torch.cat([weight,-weight],dim=1)
+        else:
+            return weight 
 
     def training_step(self, batch, batch_idx):
         """

@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from finml.models.CNNTransformer.models import CNNTransformer
 from finml.data.datamodule import ReturnBasedDataModule
 from finml.evaluation.cross_validation import PurgedKFold
-from finml.data.handler import StandardNorms
+from finml.data.handler import StandardNorm
 
 
 def define_args():
@@ -53,7 +53,11 @@ def define_args():
         # Number of workers for data loading
         num_workers=4,
 
-        # Number of filters in each CNN block
+        #if limited for pair trading to get [w,-w] weight 
+        limit_for_pair_trading = True,
+
+        # [input_feature_dim,...,expected output feature_dim of CNNBlock]
+        # [filter_numbers[-1] % filter_nums[0] == 0]
         filter_numbers=[2, 8],
 
         # Factor to determine the number of hidden units in the Transformer Encoder
@@ -66,7 +70,8 @@ def define_args():
         filter_size=2,
 
         # Number of attention heads in the Transformer Encoder
-        attention_heads=4,
+        ##[filter_numbers[-1] % attention_heads == 0]
+        attention_heads=4, 
 
         # Dropout rate in the Transformer Encoder
         dropout=0.25,
@@ -136,7 +141,7 @@ def train_folds(X, returns, event_times, args):
         checkpoint_callback = ModelCheckpoint(
             monitor='val_loss',
             mode='min',
-            dirpath=args.save_prefix,
+            dirpath=args.save_path,
             filename=f'model_fold_{fold + 1}'  # You can customize the filename pattern
         )
 
@@ -169,34 +174,45 @@ def train_folds(X, returns, event_times, args):
         # Train the model on the current fold
         trainer.fit(fold_model, data_module)
 
-        # Append the validation loss for this fold to the list
-        val_losses.append(early_stop_callback.best_score)
+        best_score_tensor = early_stop_callback.best_score
+        # Move the tensor to the CPU
+        best_score_cpu = best_score_tensor.cpu()
+        # Convert the CPU tensor to a NumPy array
+        best_score_numpy = best_score_cpu.numpy()
+        val_losses.append(best_score_numpy)
 
     mean_val_loss = np.mean(val_losses)
     print(f'The average val_loss on {args.n_splits} models is {mean_val_loss}')
 
 
-def load_model(model_path, args):
+
+def load_models(model_paths, args):
     """
-    Load a trained CNNTransformer model.
+    Load multiple trained models using PyTorch Lightning style.
 
     Args:
-        model_path (str): Path to the saved PyTorch Lightning model.
+        model_paths (list): List of paths to the saved PyTorch Lightning models.
         args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
-        CNNTransformer: Loaded CNNTransformer model.
+        list: List of loaded models.
     """
-    # Create a new model instance
-    model = CNNTransformer(args)
+    loaded_models = []
 
-    # Load the trained weights
-    model.load_state_dict(torch.load(model_path))
+    for model_path in model_paths:
+        # Extract the module name from the checkpoint file
+        module_name = os.path.splitext(os.path.basename(model_path))[0]
 
-    # Move the model to the CPU
-    model.to("cpu")
+        # Load the model using PyTorch Lightning's load_from_checkpoint
+        model = CNNTransformer.load_from_checkpoint(model_path, args=args)
+        
+        # Optionally, you can print the loaded module name
+        print(f"Loaded {module_name} from {model_path}")
 
-    return model
+        loaded_models.append(model)
+
+    return loaded_models
+
 
 def load_x_handler(filename_prefix):
     """
@@ -216,36 +232,39 @@ def load_x_handler(filename_prefix):
     else:
         raise FileNotFoundError(f"x_handler file not found: {x_handler_path}")
 
-def predict_single_input(model, input_data, x_handler, args):
+def predict_ensemble(models, input_data, x_handler, args):
     """
-    Make predictions on a single input using a trained CNNTransformer model.
+    Make predictions on a single input using an ensemble of trained CNNTransformer models.
 
     Args:
-        model (CNNTransformer): Trained CNNTransformer model.
+        models (list): List of trained CNNTransformer models.
         input_data (numpy.ndarray): Single input data as a NumPy array.
         x_handler (object): Loaded x_handler.
         args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
-        numpy.ndarray: Model predictions for the single input.
+        numpy.ndarray: Ensemble predictions for the single input.
     """
     # Transform input data using the loaded x_handler
     if x_handler is not None:
-        if not x_handler.fitted:
-            input_data = x_handler.fit_transform(input_data)
-        else:
-            input_data = x_handler.transform(input_data)
+        input_data = x_handler.transform(input_data)
 
     # Convert input_data to torch tensor and move to CPU
     input_tensor = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0).to("cpu")
 
-    # Set the model in evaluation mode and move to CPU
-    model.eval()
-    model.to("cpu")
+    # Set models in evaluation mode and move to CPU
+    for model in models:
+        model.eval()
+        model.to("cpu")
 
-    # Make predictions on the single input
+    # Make predictions with each model
+    ensemble_predictions = []
     with torch.no_grad():
-        predictions = model(input_tensor).numpy()
+        for model in models:
+            predictions = model(input_tensor).numpy()
+            ensemble_predictions.append(predictions)
 
-    return predictions
+    # Calculate the mean of predictions as the ensemble result
+    ensemble_result = np.mean(ensemble_predictions, axis=0)
 
+    return ensemble_result
