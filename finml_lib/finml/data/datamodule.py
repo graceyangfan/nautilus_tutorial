@@ -102,7 +102,6 @@ class ReturnBasedDataModule(LightningDataModule):
             x_handler=x_handler,
             save_prefix=save_prefix
         )
-        self.train_dataset.transform()
 
         # Create and transform validation dataset
         self.valid_dataset = ReturnBasedDataset(
@@ -112,7 +111,6 @@ class ReturnBasedDataModule(LightningDataModule):
             x_handler=x_handler,
             save_prefix=save_prefix
         )
-        self.valid_dataset.transform()
 
     def train_dataloader(self):
         """

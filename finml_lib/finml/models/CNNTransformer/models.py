@@ -36,11 +36,13 @@ class SharpeLoss(object):
             torch.Tensor: Negative mean of final returns divided by standard deviation.
         """
 
-        final_returns = torch.sum(return_data * weight_pred) - \
-            self.trans_cost_ratio * torch.cat((
+        trans_cost =  torch.cat((
                 torch.zeros(1, device=weight_pred.device),
-                torch.sum(torch.abs(weight_pred[1:] - weight_pred[:-1]), axis=1)
-            )) - self.hold_cost_ratio * torch.sum(torch.abs(weight_pred), axis=1)
+                torch.sum(torch.abs(weight_pred[1:] - weight_pred[:-1]), dim=1)
+            )) 
+        hold_cost =  torch.sum(torch.abs(weight_pred), dim=1)
+        final_returns = torch.sum(return_data * weight_pred,dim=1) - \
+        self.trans_cost_ratio * trans_cost  - self.hold_cost_ratio * hold_cost 
 
         # Minimize the negative mean of final returns divided by standard deviation
         return -torch.mean(final_returns) / (torch.std(final_returns)+1e-8)
@@ -281,8 +283,6 @@ class CNNTransformer(pl.LightningModule):
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=self.args.learning_rate)
 
-        # Uncomment and configure a learning rate scheduler if needed
-        # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
-        # return [optimizer], [scheduler] if using a scheduler
-
-        return optimizer
+        #configure a learning rate scheduler
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+        return [optimizer], [scheduler]

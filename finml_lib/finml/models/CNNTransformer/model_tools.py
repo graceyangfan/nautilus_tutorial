@@ -2,6 +2,7 @@ import os
 import pickle
 from types import SimpleNamespace
 
+import torch 
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -15,80 +16,62 @@ from finml.evaluation.cross_validation import PurgedKFold
 from finml.data.handler import StandardNorm
 
 
-def define_args():
+def define_args(**kwargs):
     """
     Define the arguments for the training process.
+
+    Args:
+        **kwargs: Additional keyword arguments for customizing the default parameters.
 
     Returns:
         SimpleNamespace: A namespace containing model configuration parameters.
     """
     args = SimpleNamespace(
-        # Number of splits for purged cross-validation
-        n_splits=5,
+        # Cross-validation settings
+        n_splits=5,                # Number of splits for purged cross-validation
+        embargo_pct=0.01,           # Percentage of embargo for purged cross-validation
 
-        # Percentage of embargo for purged cross-validation
-        embargo_pct=0.1,
+        # Training control
+        patience=3,                # Patience for early stopping
+        max_epochs=20,             # Maximum number of epochs for training
 
-        # Patience for early stopping
-        patience=3,
+        # Input sequence parameters
+        sequence_len=30,           # Length of input sequences
 
-        # Maximum number of epochs for training
-        max_epochs=10,
+        # Data preprocessing
+        x_handler=StandardNorm(),  # Handler for preprocessing input features
 
-        # Length of input sequences
-        sequence_len=30,
+        # Model checkpoint and saving
+        save_path='model_checkpoints/',       # Path to save PyTorch Lightning model checkpoints
+        save_prefix='model_checkpoints/scaler', # Prefix for saving preprocessing handler
 
-        # Handler for preprocessing input features
-        x_handler=StandardNorm(),
+        # Data loading settings
+        batch_size=120,           # Batch size for training
+        num_workers=4,            # Number of workers for data loading
 
-        # Path to save PyTorch Lightning model checkpoints
-        save_path='model_checkpoints/',
+        # Model architecture
+        limit_for_pair_trading=True,          # Whether to use a limit for pair trading
+        filter_numbers=[24, 24],              # Input feature_dim => CNN out feature_dim
+        hidden_units_factor=2,               # Factor to determine the number of hidden units in the Transformer Encoder
+        use_normalization=True,              # Whether to use normalization in the CNN blocks
+        filter_size=2,                       # Size of the filters in the CNN blocks
+        attention_heads=4,                   # Number of attention heads in the Transformer Encoder
+        dropout=0.25,                        # Dropout rate in the Transformer Encoder
+        output_dim=2,                        # Dimensionality of the final output
 
-        # Prefix for saving preprocessing handler
-        save_prefix='model_checkpoints/scaler',
+        # Sharpe ratio loss parameters
+        trans_cost_ratio=0.005,              # Transaction cost ratio for the Sharpe ratio loss
+        hold_cost_ratio=0,                   # Holding cost ratio for the Sharpe ratio loss
 
-        # Batch size for training
-        batch_size=64,
-
-        # Number of workers for data loading
-        num_workers=4,
-
-        #if limited for pair trading to get [w,-w] weight 
-        limit_for_pair_trading = True,
-
-        # [input_feature_dim,...,expected output feature_dim of CNNBlock]
-        # [filter_numbers[-1] % filter_nums[0] == 0]
-        filter_numbers=[2, 8],
-
-        # Factor to determine the number of hidden units in the Transformer Encoder
-        hidden_units_factor=2,
-
-        # Whether to use normalization in the CNN blocks
-        use_normalization=True,
-
-        # Size of the filters in the CNN blocks
-        filter_size=2,
-
-        # Number of attention heads in the Transformer Encoder
-        ##[filter_numbers[-1] % attention_heads == 0]
-        attention_heads=4, 
-
-        # Dropout rate in the Transformer Encoder
-        dropout=0.25,
-
-        # Dimensionality of the final output
-        output_dim=2,
-
-        # Transaction cost ratio for the Sharpe ratio loss
-        trans_cost_ratio=0.0005,
-
-        # Holding cost ratio for the Sharpe ratio loss
-        hold_cost_ratio=0.0001,
-
-        # Learning rate for the optimizer
-        learning_rate=1e-3
+        # Optimizer settings
+        learning_rate=1e-4                   # Learning rate for the optimizer
     )
+
+    # Update default arguments with user-defined values
+    args.__dict__.update(kwargs)
+
     return args
+
 
 def train_folds(X, returns, event_times, args):
     """
