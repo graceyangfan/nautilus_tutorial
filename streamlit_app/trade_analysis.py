@@ -20,19 +20,20 @@ if __name__ == "__main__":
             ("Bar","Tick")
         )
         if data_type == "Bar":
-            df = load_parquet(schema_dict[data_type],True,"load the bar data")
+            #df = load_parquet(schema_dict[data_type],True,"load the bar data")
+            df = load_csv(True,"load the bar data")
             trades = load_csv(False,"load the trade data")
             if df is not None and trades is not None:
                 #convert ts_event to datetime 
                 df = df.with_columns(
                     [
-                        (pl.col("ts_event")/10**9).alias("time")
+                        (pl.col("close_time")/10**3).alias("time")
                     ]
                 )
                 trades = trades.with_columns(
                     [
-                        pl.col("ts_opened").apply(lambda x:datetime.fromisoformat(x).timestamp()),
-                        pl.col("ts_closed").apply(lambda x:datetime.fromisoformat(x).timestamp())
+                        pl.col('ts_opened').str.strptime(pl.Datetime).dt.timestamp().alias("ts_opened"),
+                        pl.col('ts_closed').str.strptime(pl.Datetime).dt.timestamp().alias("ts_closed")
                     ]
                 )
                 kline_options = get_kline_plot_setting(df)

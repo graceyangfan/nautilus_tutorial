@@ -52,24 +52,29 @@ def get_kline_plot_setting(
     kline_options = {"chart": chart_options, "series": series_options}
     return kline_options 
 
-def get_trade_lines_setting(
-    trades
-):
-     #买入为绿色，卖空为红色
-    series_options = [] 
-    for i in range(trades.shape[0]):
-        line_data = [{"time":trades[i,"ts_opened"],"value":trades[i,"avg_px_open"]},{"time":trades[i,"ts_closed"],"value":trades[i,"avg_px_close"]}]
-        side = trades[i,"entry"] == "BUY"
-        series_options.append(
-            {
-                "type": 'Line',
-                "data": line_data,
-                "options": {
-                    "color": "#00ff00" if side  else "#ff0000",
-                    "lineWidth": 2,
-                    "lineStyle": 0 # 0-Solid, 1-Dotted, 2-Dashed, 3-LargeDashed
-                }
-            }
-        )
 
-    return series_options 
+def get_trade_lines_setting(trades):
+    # Buy is represented by green, short is represented by red
+    series_options = []
+
+    for trade in trades.iter_rows(named=True):
+        line_data = [
+            {"time": trade["ts_opened"], "value": trade["avg_px_open"]},
+            {"time": trade["ts_closed"], "value": trade["avg_px_close"]}
+        ]
+
+        side = trade["entry"] == "BUY"
+        color = "#00ff00" if side else "#ff0000"
+
+        series_options.append({
+            "type": 'Line',
+            "data": line_data,
+            "options": {
+                "color": color,
+                "lineWidth": 2,
+                "lineStyle": 0  # 0-Solid, 1-Dotted, 2-Dashed, 3-LargeDashed
+            }
+        })
+
+    return series_options
+
