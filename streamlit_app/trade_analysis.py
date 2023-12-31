@@ -32,8 +32,9 @@ if __name__ == "__main__":
                 )
                 trades = trades.with_columns(
                     [
-                        pl.col('ts_opened').str.strptime(pl.Datetime).dt.timestamp().alias("ts_opened"),
-                        pl.col('ts_closed').str.strptime(pl.Datetime).dt.timestamp().alias("ts_closed")
+                        (pl.col('ts_last')/10**9).alias("close_time"),
+                        ((pl.col('ts_last')-pl.col("duration_ns"))/10**9).alias("open_time")
+                        #pl.col('ts_closed').str.strptime(pl.Datetime).dt.timestamp().alias("ts_closed")
                     ]
                 )
                 kline_options = get_kline_plot_setting(df)

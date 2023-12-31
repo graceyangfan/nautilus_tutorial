@@ -59,8 +59,8 @@ def get_trade_lines_setting(trades):
 
     for trade in trades.iter_rows(named=True):
         line_data = [
-            {"time": trade["ts_opened"], "value": trade["avg_px_open"]},
-            {"time": trade["ts_closed"], "value": trade["avg_px_close"]}
+            {"time": trade["open_time"], "value": trade["avg_px_open"]},
+            {"time": trade["close_time"], "value": trade["avg_px_close"]}
         ]
 
         side = trade["entry"] == "BUY"
