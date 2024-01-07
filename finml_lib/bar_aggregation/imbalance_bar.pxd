@@ -15,14 +15,16 @@
 #  limitations under the License.
 # -------------------------------------------------------------------------------------------------
 
-from nautilus_trader.model.data.bar cimport Bar
+from nautilus_trader.model.data cimport Bar
 
 
 cdef class ImbalanceBar(Bar):
-    cdef double small_buy_value
-    cdef double big_buy_value
-    cdef double small_sell_value
-    cdef double big_sell_value
+    cdef double big_buy_ratio
+    cdef double big_net_buy_ratio
+    cdef double big_buy_power
+    cdef double big_net_buy_power
+    cdef double value_delta 
+    cdef int    tag
 
     @staticmethod
     cdef ImbalanceBar from_dict_c(dict values)

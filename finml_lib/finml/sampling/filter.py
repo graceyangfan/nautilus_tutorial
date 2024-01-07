@@ -33,108 +33,139 @@ def cusum_filter(bars, threshold):
     return events_indexs
 
 
-def zscore_filter(bars,period,threshold,lambda_value):
+import polars as pl
+
+def zscore_filter(
+    bars,
+    period,
+    threshold,
+    lambda_value,
+    price_col_name="price",
+    quantity_col_name="quantity",
+    datetime_col_name="timestamp"
+):
+    """
+    Filters financial bars based on z-score conditions and aggregates information for significant events.
+
+    Parameters:
+    - bars (polars.DataFrame): Input DataFrame containing financial bars.
+    - period (int): The period for calculating z-score.
+    - threshold (float): Threshold for z-score to trigger filtering.
+    - lambda_value (float): Threshold for dollar value to identify significant events.
+    - price_col_name (str): Column name for price data in the input DataFrame.
+    - quantity_col_name (str): Column name for quantity data in the input DataFrame.
+    - datetime_col_name (str): Column name for timestamp data in the input DataFrame.
+
+    Returns:
+    - polars.DataFrame: Resulting DataFrame with aggregated information for significant events.
+    """
+
+    # Calculate tick direction and fill nulls
     bars = bars.with_columns(
         [
             pl.arange(0, pl.count()).alias("count_index"),
-            (pl.col("price").diff().sign().fill_null(1).alias("tick_direction"))
+            (pl.col(price_col_name).diff().sign().fill_null(1).alias("tick_direction"))
         ]
     )
-    bars =  bars.with_columns(
-        pl.when(pl.col("tick_direction")==0)
+    
+    # Clean up tick direction nulls
+    bars = bars.with_columns(
+        pl.when(pl.col("tick_direction") == 0)
         .then(pl.lit(None))
         .otherwise(pl.col("tick_direction"))
         .fill_null(strategy="forward").alias("tick_direction")
     )
-    bars = bars.with_columns(
-        (pl.col("price").pct_change()*pl.col("quantity")*pl.col("tick_direction")).alias("imbalance")
-    )
+    
+    # Calculate imbalance and dollar value
+    bars = bars.with_columns([
+        (pl.col(price_col_name) * pl.col(quantity_col_name) * pl.col("tick_direction")).alias("imbalance"),
+        (pl.col(price_col_name) * pl.col(quantity_col_name)).alias("dollor_value"),
+    ])
+    
+    # Calculate z-score of imbalance
     imbalance = bars.select(
         [
             pl.col("count_index"),
-            ((pl.col("imbalance") - pl.col("imbalance").rolling_mean(period))/pl.col("imbalance").rolling_std(period)).alias("zscore_imbalance")
+            ((pl.col("imbalance") - pl.col("imbalance").rolling_mean(period)) / pl.col("imbalance").rolling_std(period)).alias("zscore_imbalance")
         ]
     )
-    imbalance = imbalance[period-1:]
-     
-    imbalance = imbalance.filter(pl.col("zscore_imbalance").abs() > threshold)
+    
+    # Shift the imbalance to align with the original data
+    imbalance = imbalance[period - 1:]
+    
+    # Filter bars based on z-score thresholds
+    imbalance = imbalance.filter(
+        ((pl.col("zscore_imbalance") < threshold) & (pl.col("zscore_imbalance").shift() > threshold)) |
+        ((pl.col("zscore_imbalance") > -threshold) & (pl.col("zscore_imbalance").shift() < -threshold))
+    )
+    
+    # Add group_id to the original bars
     imbalance = imbalance.with_columns(
         pl.col("count_index").alias("group_id"),
     )
-    bars = bars.join(imbalance, on = "count_index",  how = "left")
+    bars = bars.join(imbalance, on="count_index", how="left")
     bars = bars.with_columns(
         [
-            pl.col("group_id").fill_null(strategy = "backward").alias("group_id")
+            pl.col("group_id").fill_null(strategy="backward").alias("group_id")
         ]
     )
-    # drop null 
+    
+    # Drop null values
     bars = bars.filter(~pl.col("group_id").is_null())
-    print(bars.select(
-    [
-        pl.col("price"),
-        pl.col("quantity"),
-        pl.col("buyer_maker")
-    ]))
-    # aggregate bars 
-    newbars = bars.groupby("group_id").agg(
+    
+    
+    # Aggregate bars based on group_id
+    newbars = bars.group_by("group_id").agg(
         [
-            pl.col("timestamp").first().alias("ts_init"), 
-            pl.col("timestamp").last().alias("ts_event"),
-            pl.col("price").first().alias("open"),
-            pl.col("price").max().alias("high"),
-            pl.col("price").min().alias("low"),
-            pl.col("price").last().alias("close"),
-            pl.col("quantity").sum().alias("volume"),
-            (
-                (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")<lambda_value)
-                )
-            ).sum().alias("small_buy_value"),
-            (
-                (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==False)&(pl.col("price")*pl.col("quantity")>lambda_value)
-                )
-            ).sum().alias("big_buy_value"),
-            (
-                (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")<lambda_value)
-                )
-            ).sum().alias("small_sell_value"),
-            (
-                (pl.col("price")*pl.col("quantity")).filter(
-                        (pl.col("buyer_maker")==True)&(pl.col("price")*pl.col("quantity")>lambda_value)
-                )
-            ).sum().alias("big_sell_value"),
+            pl.col(datetime_col_name).first().alias("ts_init"),
+            pl.col(datetime_col_name).last().alias("ts_event"),
+            pl.col(price_col_name).first().alias("open"),
+            pl.col(price_col_name).max().alias("high"),
+            pl.col(price_col_name).min().alias("low"),
+            pl.col(price_col_name).last().alias("close"),
+            pl.col(quantity_col_name).sum().alias("volume"),
+            pl.count().alias("group_length"),
+            pl.col("dollor_value").filter((pl.col("tick_direction") > 0) & (pl.col("dollor_value") > lambda_value)).sum().alias("big_buy_dollor_sum"),
+            pl.when((pl.col("tick_direction") > 0) & (pl.col("dollor_value") > lambda_value))
+            .then(pl.col("dollor_value"))
+            .otherwise(0.0)
+            .std().alias("big_buy_dollor_std"),
+            (pl.col("dollor_value")
+             .filter((pl.col("tick_direction") > 0) & (pl.col("dollor_value") > lambda_value))
+             .sum() - pl.col("dollor_value")
+             .filter((pl.col("tick_direction") < 0) & (pl.col("dollor_value") > lambda_value))
+             .sum()).alias("big_dif_sum"),
+            (pl.when((pl.col("tick_direction") > 0) & (pl.col("dollor_value") > lambda_value))
+            .then(pl.col("dollor_value"))
+            .otherwise(0.0) - pl.when((pl.col("tick_direction") < 0) & (pl.col("dollor_value") > lambda_value))
+            .then(pl.col("dollor_value"))
+            .otherwise(0.0)).std().alias("big_dif_std")
         ]
     )
-    #fill null for volume aggregate 
-    newbars = newbars.with_columns(
-        [
-            pl.col("small_buy_value").fill_null(0.0).alias("small_buy_value"),
-            pl.col("big_buy_value").fill_null(0.0).alias("big_buy_value"),
-            pl.col("small_sell_value").fill_null(0.0).alias("small_sell_value"),
-            pl.col("big_sell_value").fill_null(0.0).alias("big_sell_value"),
-        ]
-    )
+    
+    # Sort bars based on event timestamp
     newbars = newbars.sort("ts_event")
-    # drop the first bar 
+    
+    # Drop the first bar
     newbars = newbars[1:]
-    # select columns
+    
+    # Select columns for the final result
     newbars = newbars.select(
         [
+            pl.col("ts_init"),
+            pl.col("ts_event"),
             pl.col("open"),
             pl.col("high"),
             pl.col("low"),
             pl.col("close"),
             pl.col("volume"),
-            pl.col("small_buy_value"),
-            pl.col("big_buy_value"),
-            pl.col("small_sell_value"),
-            pl.col("big_sell_value"),
-            pl.col("ts_init"),
-            pl.col("ts_event"),
-            (pl.col("big_buy_value") - pl.col("big_sell_value")).alias("buyer_maker_imbalance"),
+            (pl.col("big_buy_dollor_sum") / pl.col("volume")).alias("big_buy_ratio"),
+            (pl.col("big_dif_sum") / pl.col("volume")).alias("big_net_buy_ratio"),
+            (pl.col("big_buy_dollor_sum") / pl.col("group_length") / (pl.col("big_buy_dollor_std")+1e-9)).alias("big_buy_power"),
+            (pl.col("big_dif_sum") / pl.col("group_length") / (pl.col("big_dif_std")+1e-9)).alias("big_net_buy_power")
         ]
     )
+    
     return newbars
+
 

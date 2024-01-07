@@ -14,10 +14,11 @@
 # -------------------------------------------------------------------------------------------------
 
 from libc.stdint cimport uint64_t
+import pyarrow as pa
 
 from nautilus_trader.core.correctness cimport Condition
-from nautilus_trader.model.data.bar cimport Bar
-from nautilus_trader.model.data.bar cimport BarType
+from nautilus_trader.model.data cimport Bar
+from nautilus_trader.model.data cimport BarType
 from nautilus_trader.model.objects cimport Price
 from nautilus_trader.model.objects cimport Quantity
 
@@ -55,10 +56,12 @@ cdef class ImbalanceBar(Bar):
         Price low not None,
         Price close not None,
         Quantity volume not None,
-        double small_buy_value,
-        double big_buy_value,
-        double small_sell_value,
-        double big_sell_value,
+        double big_buy_ratio,
+        double big_net_buy_ratio,
+        double big_buy_power,
+        double big_net_buy_power,
+        double value_delta,
+        int tag,
         uint64_t ts_event,
         uint64_t ts_init,
     ):
@@ -73,23 +76,49 @@ cdef class ImbalanceBar(Bar):
             ts_init=ts_init,
         )
 
-        self.small_buy_value = small_buy_value 
-        self.big_buy_value = big_buy_value
-        self.small_sell_value = small_sell_value
-        self.big_sell_value = big_sell_value
+        self.big_buy_ratio = big_buy_ratio 
+        self.big_net_buy_ratio = big_net_buy_ratio
+        self.big_buy_power = big_buy_power
+        self.big_net_buy_power = big_net_buy_power
+        self.value_delta = value_delta 
+        self.tag = tag 
 
     def __getstate__(self):
         return (
             *super().__getstate__(),
-            str(self.small_buy_value),
-            str(self.big_buy_value),
-            str(self.small_sell_value),
-            str(self.big_sell_value),
+            str(self.big_buy_ratio),
+            str(self.big_net_buy_ratio),
+            str(self.big_buy_power),
+            str(self.big_net_buy_power),
+            str(self.value_delta),
+            str(self.tag),
         )
 
     def __setstate__(self, state):
 
         super().__setstate__(state[:15])
+
+    @classmethod
+    def schema(cls):
+        return pa.schema(
+            {
+                "bar_type": pa.dictionary(pa.int8(), pa.string()),
+                "open": pa.string(),
+                "high": pa.string(),
+                "low": pa.string(),
+                "close": pa.string(),
+                "volume": pa.string(),
+                "big_buy_ratio": pa.float64(),
+                "big_net_buy_ratio": pa.float64(),
+                "big_buy_power": pa.float64(),
+                "big_net_buy_power": pa.float64(),
+                "value_delta": pa.float64(),
+                "tag":pa.uint64(),
+                "ts_event": pa.uint64(),
+                "ts_init": pa.uint64(),
+            },
+            metadata={"type": "ImbalanceBar"},
+        )
 
     def __repr__(self) -> str:
         return (
@@ -100,10 +129,12 @@ cdef class ImbalanceBar(Bar):
             f"low={self.low}, "
             f"close={self.close}, "
             f"volume={self.volume}, "
-            f"small_buy_value={self.small_buy_value}, "
-            f"big_buy_value={self.big_buy_value}, "
-            f"small_sell_value={self.small_sell_value}, "
-            f"big_sell_value={self.big_sell_value}, "
+            f"big_buy_ratio={self.big_buy_ratio}, "
+            f"big_net_buy_ratio={self.big_net_buy_ratio}, "
+            f"big_buy_power={self.big_buy_power}, "
+            f"big_net_buy_power={self.big_net_buy_power}, "
+            f"value_delta={self.value_delta}, "
+            f"tag={self.tag}, "
             f"ts_event={self.ts_event}, "
             f"ts_init={self.ts_init})"
         )
@@ -132,10 +163,12 @@ cdef class ImbalanceBar(Bar):
             low=Price.from_str(values["low"]),
             close=Price.from_str(values["close"]),
             volume=Quantity.from_str(values["volume"]),
-            small_buy_value=values["small_buy_value"],
-            big_buy_value=values["big_buy_value"],
-            small_sell_value=values["small_sell_value"],
-            big_sell_value=values["big_sell_value"],
+            big_buy_ratio=values["big_buy_ratio"],
+            big_net_buy_ratio=values["big_net_buy_ratio"],
+            big_buy_power=values["big_buy_power"],
+            big_net_buy_power=values["big_net_buy_power"],
+            value_delta=values["value_delta"],
+            tag=values["tag"],
             ts_event=values["ts_event"],
             ts_init=values["ts_init"],
         )
@@ -159,10 +192,12 @@ cdef class ImbalanceBar(Bar):
             "low": str(obj.low),
             "close": str(obj.close),
             "volume": str(obj.volume),
-            "small_buy_value": obj.small_buy_value,
-            "big_buy_value": obj.big_buy_value,
-            "small_sell_value": obj.small_sell_value,
-            "big_sell_value": obj.big_sell_value,
+            "big_buy_ratio": obj.big_buy_ratio,
+            "big_net_buy_ratio": obj.big_net_buy_ratio,
+            "big_buy_power": obj.big_buy_power,
+            "big_net_buy_power": obj.big_net_buy_power,
+            "value_delta":obj.value_delta,
+            "tag":obj.tag,
             "ts_event": obj.ts_event,
             "ts_init": obj.ts_event,
         }
@@ -197,49 +232,73 @@ cdef class ImbalanceBar(Bar):
         return ImbalanceBar.to_dict_c(obj)
 
     @property
-    def small_buy_value(self) -> double:
+    def big_buy_ratio(self) -> double:
         """
-        Return the small_buy_value.
+        Return the big_buy_ratio.
 
         Returns
         -------
         double
 
         """
-        return self.small_buy_value
+        return self.big_buy_ratio
 
     @property
-    def big_buy_value(self) -> double:
+    def big_net_buy_ratio(self) -> double:
         """
-        Return the big_buy_value.
+        Return the big_net_buy_ratio.
 
         Returns
         -------
         double
 
         """
-        return self.big_buy_value
+        return self.big_net_buy_ratio
 
     @property
-    def small_sell_value(self) -> double:
+    def big_buy_power(self) -> double:
         """
-        Return the small_sell_value.
+        Return the big_buy_power.
 
         Returns
         -------
         double
 
         """
-        return self.small_sell_value
+        return self.big_buy_power
 
     @property
-    def big_sell_value(self) -> double:
+    def big_net_buy_power(self) -> double:
         """
-        Return the big_sell_value.
+        Return the big_net_buy_power.
 
         Returns
         -------
         double
 
         """
-        return self.big_sell_value
+        return self.big_net_buy_power
+
+
+    @property
+    def value_delta(self) -> double:
+        """
+        Return the value_delta.
+
+        Returns
+        -------
+        double
+
+        """
+        return self.value_delta
+    @property
+    def tag(self) -> int:
+        """
+        Return the tag.
+
+        Returns
+        -------
+        int
+
+        """
+        return self.tag
