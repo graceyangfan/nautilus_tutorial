@@ -192,3 +192,5 @@ if __name__ == "__main__":
         df.write_parquet(os.path.join("/tmp",instrument_id+".parquet"))
     results = select_params(df,njobs=1)
     results.to_csv("select.csv")
+
+

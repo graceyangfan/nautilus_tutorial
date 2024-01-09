@@ -33,8 +33,6 @@ def cusum_filter(bars, threshold):
     return events_indexs
 
 
-import polars as pl
-
 def zscore_filter(
     bars,
     period,
@@ -81,24 +79,28 @@ def zscore_filter(
         (pl.col(price_col_name) * pl.col(quantity_col_name) * pl.col("tick_direction")).alias("imbalance"),
         (pl.col(price_col_name) * pl.col(quantity_col_name)).alias("dollor_value"),
     ])
+
+    bars = bars.with_columns(
+        [
+            ((pl.col("imbalance") - pl.col("imbalance").rolling_mean(period)) / pl.col("imbalance").rolling_std(period)).alias("zscore_imbalance")
+        ])
     
     # Calculate z-score of imbalance
     imbalance = bars.select(
         [
             pl.col("count_index"),
-            ((pl.col("imbalance") - pl.col("imbalance").rolling_mean(period)) / pl.col("imbalance").rolling_std(period)).alias("zscore_imbalance")
+            pl.col("zscore_imbalance")
         ]
     )
     
+    
     # Shift the imbalance to align with the original data
     imbalance = imbalance[period - 1:]
-    
     # Filter bars based on z-score thresholds
     imbalance = imbalance.filter(
         ((pl.col("zscore_imbalance") < threshold) & (pl.col("zscore_imbalance").shift() > threshold)) |
         ((pl.col("zscore_imbalance") > -threshold) & (pl.col("zscore_imbalance").shift() < -threshold))
     )
-    
     # Add group_id to the original bars
     imbalance = imbalance.with_columns(
         pl.col("count_index").alias("group_id"),
@@ -112,7 +114,6 @@ def zscore_filter(
     
     # Drop null values
     bars = bars.filter(~pl.col("group_id").is_null())
-    
     
     # Aggregate bars based on group_id
     newbars = bars.group_by("group_id").agg(
