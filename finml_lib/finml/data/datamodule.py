@@ -63,7 +63,6 @@ class ReturnBasedDataModule(LightningDataModule):
         returns_train (array-like or DataFrame): Training returns for asset allocation optimization.
         x_test (array-like or DataFrame): Validation input features.
         returns_test (array-like or DataFrame): Validation returns for asset allocation optimization.
-        sequence_len (int): Length of sequences to be used.
         x_handler (object): An optional handler for preprocessing input features.
         save_prefix (str): Prefix for saving the preprocessing handler.
         batch_size (int): Batch size for DataLoader.
@@ -84,8 +83,8 @@ class ReturnBasedDataModule(LightningDataModule):
         returns_train,
         x_test,
         returns_test,
-        sequence_len=30,
         x_handler=None,
+        is_classification=False,
         save_prefix="scaler",
         batch_size=64,
         num_workers=4
@@ -97,18 +96,18 @@ class ReturnBasedDataModule(LightningDataModule):
         # Create and transform training dataset
         self.train_dataset = ReturnBasedDataset(
             X=x_train,
-            returns=returns_train,
-            sequence_len=sequence_len,
+            returns_label=returns_train,
             x_handler=x_handler,
+            is_classification=is_classification,
             save_prefix=save_prefix
         )
 
         # Create and transform validation dataset
         self.valid_dataset = ReturnBasedDataset(
             X=x_test,
-            returns=returns_test,
-            sequence_len=sequence_len,
+            returns_label=returns_test,
             x_handler=x_handler,
+            is_classification=is_classification,
             save_prefix=save_prefix
         )
 

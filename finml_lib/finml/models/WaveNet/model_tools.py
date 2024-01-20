@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from collections import Counter
+
 from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
@@ -28,15 +30,12 @@ def define_args(**kwargs):
     """
     args = SimpleNamespace(
         # Cross-validation settings
-        n_splits=5,                # Number of splits for purged cross-validation
+        n_splits=3,                # Number of splits for purged cross-validation
         embargo_pct=0.01,           # Percentage of embargo for purged cross-validation
 
         # Training control
         patience=3,                # Patience for early stopping
         max_epochs=20,             # Maximum number of epochs for training
-
-        # Input sequence parameters
-        sequence_len=30,           # Length of input sequences
 
         # Data preprocessing
         x_handler=StandardNorm(),  # Handler for preprocessing input features
@@ -50,8 +49,9 @@ def define_args(**kwargs):
         num_workers=4,            # Number of workers for data loading
 
         # Model params 
+        scale = 1.0,
         input_dim = 16,           # Dimensionality of input features
-        output_dim = 1,           # Desired output dimensionality of the model
+        output_dim = 2,           # Desired output dimensionality of the model
         residual_dim = 32,        # Dimensionality of the residual blocks in the model
         skip_dim = 32,            # Dimensionality of the skip connections
         dilation_cycles = 1,      # Number of dilation cycles in the model
@@ -73,23 +73,21 @@ def train_folds(X, returns, event_times, args):
     Train a WaveNet model using purged cross-validation with early stopping.
 
     Args:
-        X (pl.DataFrame): Input features as a Polars DataFrame.
-        returns (pl.DataFrame): Returns for asset allocation optimization as a Polars DataFrame.
+        X (numpy.ndarray): Input features with shape [batch_size, sequence_length, feature_dim].
+            You can use np.stack(list_feature, axis=0) to obtain X.
+        returns (numpy.ndarray): Returns for asset allocation optimization with shape [batch_size, 1].
         event_times (pl.DataFrame): Event times for purged cross-validation as a Polars DataFrame.
         args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
 
     Returns:
         None
     """
-    # Convert DataFrames to pandas if needed
-    if isinstance(X, pl.DataFrame):
-        X = X.to_pandas()
-    if isinstance(returns, pl.DataFrame):
-        returns = returns.to_pandas()
+    # Ensure event_times is a Polars DataFrame
     if not isinstance(event_times, pl.DataFrame):
         event_times = pl.from_pandas(event_times)
 
-    seed_everything(42) 
+    # Set a fixed seed for reproducibility
+    seed_everything(42)
 
     # Initialize PurgedKFold with specified parameters
     purged_kfold = PurgedKFold(
@@ -104,7 +102,7 @@ def train_folds(X, returns, event_times, args):
     for fold, (train_indices, val_indices) in enumerate(purged_kfold.split(event_times)):
         print(f"Fold {fold + 1}")
 
-        # Create a new model instance for each fold
+        # Create a new instance of the WaveNet model for each fold
         fold_model = WaveNet(args)
 
         # Set up early stopping callback
@@ -132,17 +130,17 @@ def train_folds(X, returns, event_times, args):
             callbacks=[early_stop_callback, checkpoint_callback]
         )
 
-        # Use loc to obtain training and validation sets
-        x_train, x_test = X.loc[train_indices], X.loc[val_indices]
-        returns_train, returns_test = returns.loc[train_indices], returns.loc[val_indices]
+        # Use indices to obtain training and validation sets
+        x_train, x_test = X[train_indices], X[val_indices]
+        returns_train, returns_test = returns[train_indices], returns[val_indices]
 
-        # Create and transform training dataset
+        # Create and transform the training dataset
         data_module = ReturnBasedDataModule(
             x_train=x_train,
             returns_train=returns_train,
             x_test=x_test,
             returns_test=returns_test,
-            sequence_len=args.sequence_len,
+            is_classification=args.is_classification,
             x_handler=args.x_handler,
             save_prefix=args.save_prefix,
             batch_size=args.batch_size,
@@ -152,6 +150,7 @@ def train_folds(X, returns, event_times, args):
         # Train the model on the current fold
         trainer.fit(fold_model, data_module)
 
+        # Get the best validation loss from the early stopping callback
         best_score_tensor = early_stop_callback.best_score
         # Move the tensor to the CPU
         best_score_cpu = best_score_tensor.cpu()
@@ -159,6 +158,7 @@ def train_folds(X, returns, event_times, args):
         best_score_numpy = best_score_cpu.numpy()
         val_losses.append(best_score_numpy)
 
+    # Calculate and print the mean validation loss across all folds
     mean_val_loss = np.mean(val_losses)
     print(f'The average val_loss on {args.n_splits} models is {mean_val_loss}')
 
@@ -210,7 +210,7 @@ def load_x_handler(filename_prefix):
     else:
         raise FileNotFoundError(f"x_handler file not found: {x_handler_path}")
 
-def predict_ensemble(models, input_data, x_handler, args):
+def regression_ensemble(models, input_data, x_handler, args):
     """
     Make predictions on a single input using an ensemble of trained WaveNet models.
 
@@ -246,3 +246,63 @@ def predict_ensemble(models, input_data, x_handler, args):
     ensemble_result = np.mean(ensemble_predictions, axis=0)
 
     return ensemble_result
+
+
+def classify_ensemble(models, input_data, x_handler, args, method='vote', return_probs=False):
+    """
+    Make predictions for classification on a single input using an ensemble of trained models.
+
+    Args:
+        models (list): List of trained models.
+        input_data (numpy.ndarray): Single input data as a NumPy array.
+        x_handler (object): Loaded x_handler.
+        args (SimpleNamespace): A SimpleNamespace containing model configuration parameters.
+        method (str): Method for combining predictions. Either 'mean' or 'vote'. Default is 'vote'.
+        return_probs (bool): Whether to return class probabilities. Default is False.
+
+    Returns:
+        int or tuple: If return_probs is False, returns the ensemble prediction for the single input.
+                     If return_probs is True, returns a tuple containing the ensemble prediction and
+                     the mean of class probabilities.
+    """
+    # Transform input data using the loaded x_handler
+    if x_handler is not None:
+        input_data = x_handler.transform(input_data)
+
+    # Convert input_data to torch tensor and move to CPU
+    input_tensor = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0).to("cpu")
+
+    # Set models in evaluation mode and move to CPU
+    for model in models:
+        model.eval()
+        model.to("cpu")
+
+    # Make predictions with each model
+    ensemble_predictions = []
+    with torch.no_grad():
+        for model in models:
+            # Assuming the model outputs class probabilities
+            predictions = torch.nn.functional.softmax(model(input_tensor), dim=1).numpy()
+            ensemble_predictions.append(predictions)
+
+    # Calculate the mean of class probabilities in the outer scope
+    ensemble_probs = np.mean(ensemble_predictions, axis=0)
+    # Combine predictions based on the selected method
+    if method == 'mean':
+        # Select the label with the highest mean probability
+        ensemble_result = np.argmax(ensemble_probs, axis=1)[0]
+    elif method == 'vote':
+        # Use argmax to get the predicted label for each model
+        model_predictions = np.argmax(np.array(ensemble_predictions), axis=2)
+        # Perform voting by counting occurrences of each label
+        label_counts = Counter(model_predictions.flatten())
+        # Select the label with the highest count
+        ensemble_result = label_counts.most_common(1)[0][0]
+    else:
+        raise ValueError("Invalid method. Supported methods are 'mean' and 'vote'.")
+
+    if return_probs:
+        return ensemble_result, ensemble_probs[0][ensemble_result]
+    else:
+        return ensemble_result
+

@@ -135,77 +135,70 @@ class SequenceLabelDataset(Dataset):
             return x
 
 
+
 class ReturnBasedDataset(Dataset):
     """
-    A dataset designed for end-to-end optimization of indicators like the Sharpe ratio.
+    PyTorch Dataset for handling datasets with input features and returns labels.
 
     Args:
-        X (array-like or DataFrame): Input features.
-        returns (array-like or DataFrame): Returns for asset allocation optimization.
-        sequence_len (int): Length of sequences to be used.
-        x_handler (object): An optional handler for preprocessing input features.
-        save_prefix (str): Prefix for saving the preprocessing handler.
+        X (list or array-like): Input features for the dataset.
+        returns_label (list or array-like): Returns labels associated with each set of input features.
+        x_handler (object, optional): An optional handler for preprocessing input features (default is None).
+        is_classification (bool, optional): Indicates whether the task is a classification task (default is False).
+        save_prefix (str, optional): Prefix for saving the preprocessing handler (default is "scaler").
 
     Attributes:
-        X (numpy.ndarray): Processed input features.
-        returns (numpy.ndarray): Returns for asset allocation optimization.
-        sequence_len (int): Length of sequences.
-        x_handler (object): Handler for preprocessing input features.
         save_prefix (str): Prefix for saving the preprocessing handler.
+        X (list or array-like): Input features for the dataset.
+        returns_label (list or array-like): Returns labels associated with each set of input features.
+        x_handler (object): Handler for preprocessing input features.
+        is_classification (bool): Indicates whether the task is a classification task.
 
     Note:
         If x_handler is provided, it will be used for preprocessing input features.
-        The shape of the processed input features (X) will be [batch_size, sequence_length, feature_dim].
-        The shape of returns will be [batch_size, assert_num].
+        X should shape like [Sequence_length,feature_dim].
     """
     def __init__(
-        self, 
-        X, 
-        returns, 
-        sequence_len=30,
+        self,
+        X,
+        returns_label,
         x_handler=None,
+        is_classification=False,
         save_prefix="scaler"
     ):
         super().__init__()
 
         self.save_prefix = save_prefix
-        
-        # Ensure the lengths of X and returns are the same
-        assert len(X) == len(returns), "Lengths of X and returns must be the same."
 
-        # Convert DataFrame to numpy array if necessary
-        if isinstance(X, (pd.DataFrame, pd.Series)):
-            X = X.values
-        if returns is not None and isinstance(returns, (pd.DataFrame, pd.Series)):
-            returns = returns.values
+        # Ensure the lengths of X and returns_label are the same
+        assert len(X) == len(returns_label), "Lengths of X and returns_label must be the same."
 
         self.X = X
-        self.returns = returns
-        self.sequence_len = sequence_len
+        self.returns_label = returns_label
         self.x_handler = x_handler
-        self.transform()
+        self.is_classification = is_classification  # Added missing is_classification parameter
+        self.fit()
 
-    def transform(self):
+    def fit(self):
         """
-        Apply preprocessing transformations to input features if a handler is provided.
-        Save the handler if not already fitted.
+        Fit the input handler if provided and not already fitted.
+        Save the handler for future use.
         """
         if self.x_handler:
             if not self.x_handler.is_fitted():
-                self.X = self.x_handler.fit_transform(self.X)
+                self.x_handler.fit(np.vstack(self.X))
                 # Save the handler for future use
                 with open(self.save_prefix + "_x.pkl", "wb") as f:
                     pickle.dump(self.x_handler, f)
-            else:
-                self.X = self.x_handler.transform(self.X)
 
     def __len__(self):
         """
         Get the length of the dataset.
+
         Returns:
             int: Length of the dataset.
         """
-        return self.X.shape[0] - self.sequence_len + 1
+        return len(self.X)
 
     def __getitem__(self, idx):
         """
@@ -215,9 +208,13 @@ class ReturnBasedDataset(Dataset):
             idx (int): Index of the item.
 
         Returns:
-            tuple: Tuple containing input sequence and returns for asset allocation optimization.
+            tuple: Tuple containing input sequence and returns_label.
         """
-        x = torch.as_tensor(self.X[idx:idx + self.sequence_len], dtype=torch.float32)
-        # Returns for asset allocation optimization
-        returns = torch.as_tensor(self.returns[idx + self.sequence_len - 1], dtype=torch.float32)
-        return x, returns
+        x = torch.as_tensor(self.x_handler.transform(self.X[idx]), dtype=torch.float32)
+        # returns_label for asset allocation optimization
+        if self.is_classification:
+            return_label = torch.as_tensor(self.returns_label[idx],  dtype=torch.long)
+        else:
+            return_label = torch.as_tensor(self.returns_label[idx], dtype=torch.float32)
+
+        return x,return_label

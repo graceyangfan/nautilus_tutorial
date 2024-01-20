@@ -3,10 +3,68 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torchmetrics.functional.regression import concordance_corrcoef
 
+import torch
+import torch.nn as nn
+
+class FocalLoss(nn.Module):
+    """
+    Focal Loss is designed to address class imbalance in classification tasks.
+
+    Args:
+        weight (Tensor, optional): A manual rescaling weight given to each class. Default is None.
+        reduction (str, optional): Specifies the reduction to be applied to the output. 
+                                  Should be one of: 'none', 'mean', 'sum'. Default is 'mean'.
+        gamma (float, optional): Focusing parameter for adjusting the loss. Default is 0.
+        eps (float, optional): Small value to prevent division by zero. Default is 1e-7.
+
+    Attributes:
+        gamma (float): Focusing parameter.
+        eps (float): Small value to prevent division by zero.
+        ce (CrossEntropyLoss): Cross-entropy loss function.
+
+    Note:
+        Focal Loss combines the standard cross-entropy loss with a focusing parameter (gamma) 
+        to give more importance to hard-to-classify samples, addressing class imbalance.
+
+    """
+    def __init__(self, weight=None, reduction='mean', gamma=0, eps=1e-7):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.eps = eps
+        self.ce = torch.nn.CrossEntropyLoss(weight=weight, reduction=reduction)
+
+    def forward(self, input, target):
+        """
+        Calculate the Focal Loss.
+
+        Args:
+            input (Tensor): Predicted logits from the model.
+            target (Tensor): Ground truth labels.
+
+        Returns:
+            Tensor: Focal Loss value.
+
+        """
+        # Calculate the standard cross-entropy loss
+        logp = self.ce(input, target)
+        
+        # Calculate the probability and focal loss
+        p = torch.exp(-logp)
+        loss = (1 - p) ** self.gamma * logp
+
+        # Return the mean loss value
+        return loss.mean()
+
+
+
 class ConcordanceLoss(nn.Module):
     """
     Loss based on the concordance correlation coefficient.
     """
+    def __init__(self, scale=100):
+        super(ConcordanceLoss, self).__init__()
+        self.scale = scale
+
     def forward(self, y_pred, y_true):
         """
         Calculate the concordance correlation coefficient loss.
@@ -18,8 +76,9 @@ class ConcordanceLoss(nn.Module):
         Returns:
             torch.Tensor: Concordance correlation coefficient loss.
         """
-        concordance_loss = - concordance_corrcoef(y_pred, y_true)
+        concordance_loss = - concordance_corrcoef(self.scale * y_pred, self.scale * y_true)
         return concordance_loss
+
 
 
 
@@ -174,6 +233,7 @@ class WaveNet(pl.LightningModule):
             - skip_dim (int): The dimensionality of the skip connections.
             - dilation_cycles (int): The number of dilation cycles in the model.
             - dilation_depth (int): The depth of dilation in each residual block.
+            - is_classification (bool): Is the task is classification.
             - learning_rate (float): The learning rate used by the optimizer during training.
         """
         super(WaveNet, self).__init__()
@@ -185,6 +245,7 @@ class WaveNet(pl.LightningModule):
         self.skip_dim = args.skip_dim
         self.dilation_cycles = args.dilation_cycles
         self.dilation_depth = args.dilation_depth
+        self.is_classification = args.is_classification
 
         self.input_conv = CausalConv1d(self.input_dim, self.residual_dim, kernel_size=3)
 
@@ -199,7 +260,12 @@ class WaveNet(pl.LightningModule):
         self.tanh = nn.Tanh()
 
         # Criterion 1 represents almost the same
-        self.criterion = ConcordanceLoss()
+        if self.is_classification:
+            self.loss_func = FocalLoss(gamma=1)
+            self.criterion = FocalLoss(gamma=1) 
+        else:
+            self.loss_func = ConcordanceLoss(args.scale)
+            self.criterion = concordance_corrcoef
 
     def forward(self, x):
         """
@@ -237,9 +303,11 @@ class WaveNet(pl.LightningModule):
         # [batch_size, skip_dim, seq_len] => [batch_size, seq_len, skip_dim]
         attended_skips = attended_skips.permute(0, 2, 1)
         #[batch_size, skip_dim] => [batch_size, output_dim] 
-        signal = self.tanh(self.linear(attended_skips[:, -1, :]))
-
-        return signal
+        signal = self.linear(attended_skips[:, -1, :])
+        if self.is_classification:
+            return signal
+        else:
+            return self.tanh(signal)
 
     def training_step(self, batch, batch_idx):
         """
@@ -254,7 +322,7 @@ class WaveNet(pl.LightningModule):
         """
         input_data, label = batch
         signal = self(input_data)
-        loss = self.criterion(label, signal)
+        loss = self.loss_func(signal, label)
 
         # Log training loss
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -274,7 +342,7 @@ class WaveNet(pl.LightningModule):
         """
         input_data, label = batch
         signal = self(input_data)
-        loss = self.criterion(label, signal)
+        loss = self.criterion(signal, label)
 
         # Log validation loss
         self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
