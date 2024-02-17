@@ -14,11 +14,23 @@ pub(crate) struct GroupByRollingKwargs {
 pub fn pl_rolling_idxmax(inputs: &[Series], kwargs: GroupByRollingKwargs) ->PolarsResult<Series> 
 {
     let out_name = "idxmax";
-    let index_series: Vec<_> = (0..inputs[0].len() as i64).collect();
-    let df = df!(
-        "x" => inputs[0].clone(),
-        "index" => index_series
-    )?;
+    let mut result: Vec<Series> = Vec::new();
+    // Add index series
+    let index_series = Series::new("index", (0..inputs[0].len() as i64).collect::<Vec<_>>());
+    result.push(index_series);
+    // Add x series
+    let x_series = inputs[0].clone().with_name("x");
+    result.push(x_series);
+
+    // Add series from inputs[1] to last one with names from by_columns[0] to last one
+    if let Some(by_columns) = &kwargs.by_columns {
+        for (i, series) in inputs[1..].iter().enumerate() {
+            let name = by_columns[i].clone();
+            result.push(series.clone().with_name(&name));
+        }
+    }
+    let df = DataFrame::new(result)?;
+    let shift_window = kwargs.window as i32 - 1; 
     //use rolling 
     let mut out = df
             .lazy()
@@ -31,14 +43,26 @@ pub fn pl_rolling_idxmax(inputs: &[Series], kwargs: GroupByRollingKwargs) ->Pola
                     None => vec![],
                 },
                 RollingGroupOptions {
-                    period: Duration::parse(&format!("{}i", &kwargs.window)),
-                    offset: Duration::parse(&format!("-{}i", &kwargs.window)),
+                    period: Duration::parse(&format!("{}i", kwargs.window)),
+                    offset: Duration::parse(&format!("-{}i", kwargs.window)),
                     closed_window: ClosedWindow::Right,
                     ..Default::default()
                 }
             )
-            .agg([col("x").arg_max().alias(out_name)])
-            .select([when(col("index").lt(lit(kwargs.window))).then(lit(NULL)).otherwise(col(out_name)).alias(out_name)])
+            .agg([
+                col("x").arg_max().alias(out_name)
+            ])
+            .with_columns([
+                match &kwargs.by_columns {
+                    Some(by_columns) => col(out_name)
+                                        .shift(lit(-shift_window))
+                                        .shift(lit(shift_window))
+                                        .over(by_columns.iter().map(|name| col(name)).collect::<Vec<_>>()),
+                   None =>  col(out_name)
+                            .shift(lit(-shift_window))
+                            .shift(lit(shift_window)),
+                }
+            ])
             .collect()?;
     out.drop_in_place(out_name)
 }
