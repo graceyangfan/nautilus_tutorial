@@ -41,19 +41,21 @@ def define_args(**kwargs):
         x_handler=StandardNorm(),  # Handler for preprocessing input features
 
         # Model checkpoint and saving
-        save_path='model_checkpoints/',       # Path to save PyTorch Lightning model checkpoints
-        save_prefix='model_checkpoints/scaler', # Prefix for saving preprocessing handler
+        save_path='model_checkpoints/classification',       # Path to save PyTorch Lightning model checkpoints
+        save_prefix='model_checkpoints/classification_scaler', # Prefix for saving preprocessing handler
 
         # Data loading settings
-        batch_size=120,           # Batch size for training
+        is_classification = True,
+        use_normalization = False,
+        batch_size=60,           # Batch size for training
         num_workers=4,            # Number of workers for data loading
 
         # Model params 
         scale = 1.0,
-        input_dim = 16,           # Dimensionality of input features
+        input_dim = 18,           # Dimensionality of input features
         output_dim = 2,           # Desired output dimensionality of the model
-        residual_dim = 32,        # Dimensionality of the residual blocks in the model
-        skip_dim = 32,            # Dimensionality of the skip connections
+        residual_dim = 36,        # Dimensionality of the residual blocks in the model
+        skip_dim = 36,            # Dimensionality of the skip connections
         dilation_cycles = 1,      # Number of dilation cycles in the model
         dilation_depth = 4,       # Depth of dilation in each residual block
 
@@ -283,10 +285,13 @@ def classify_ensemble(models, input_data, x_handler, args, method='vote', return
         for model in models:
             # Assuming the model outputs class probabilities
             predictions = torch.nn.functional.softmax(model(input_tensor), dim=1).numpy()
+            print(model(input_tensor))
             ensemble_predictions.append(predictions)
+        
 
     # Calculate the mean of class probabilities in the outer scope
     ensemble_probs = np.mean(ensemble_predictions, axis=0)
+    print(ensemble_predictions)
     # Combine predictions based on the selected method
     if method == 'mean':
         # Select the label with the highest mean probability
@@ -294,8 +299,10 @@ def classify_ensemble(models, input_data, x_handler, args, method='vote', return
     elif method == 'vote':
         # Use argmax to get the predicted label for each model
         model_predictions = np.argmax(np.array(ensemble_predictions), axis=2)
+        print(model_predictions)
         # Perform voting by counting occurrences of each label
         label_counts = Counter(model_predictions.flatten())
+        print(label_counts)
         # Select the label with the highest count
         ensemble_result = label_counts.most_common(1)[0][0]
     else:

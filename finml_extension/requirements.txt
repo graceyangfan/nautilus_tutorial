@@ -1,0 +1,2 @@
+maturin[patchelf]
+polars

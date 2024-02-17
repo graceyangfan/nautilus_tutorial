@@ -218,3 +218,5 @@ if __name__ == "__main__":
     total_results["params"] = PARAM_SET
     total_results = total_results.sort_values(by="stats_pnls",ascending=False)
     total_results.to_csv("backtets_results.csv")
+    
+  

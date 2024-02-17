@@ -3,7 +3,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 
 
-class SharpeLoss(object):
+class SharpeLoss(nn.Module):
     """
     Loss of Sharpe ratio with penalties for transaction cost and holding cost.
     Aims for fewer open trades and a faster earning and exit strategy.
@@ -20,11 +20,11 @@ class SharpeLoss(object):
             trans_cost_ratio (float): Ratio for transaction cost penalty.
             hold_cost_ratio (float): Ratio for holding cost penalty.
         """
-        super().__init__()
+        super(SharpeLoss, self).__init__()
         self.trans_cost_ratio = trans_cost_ratio
         self.hold_cost_ratio = hold_cost_ratio
 
-    def __call__(self, return_data, weight_pred):
+    def forward(self, return_data, weight_pred):
         """
         Calculate the Sharpe ratio loss with penalties for transaction cost and holding cost.
 
@@ -36,16 +36,16 @@ class SharpeLoss(object):
             torch.Tensor: Negative mean of final returns divided by standard deviation.
         """
 
-        trans_cost =  torch.cat((
-                torch.zeros(1, device=weight_pred.device),
-                torch.sum(torch.abs(weight_pred[1:] - weight_pred[:-1]), dim=1)
-            )) 
-        hold_cost =  torch.sum(torch.abs(weight_pred), dim=1)
-        final_returns = torch.sum(return_data * weight_pred,dim=1) - \
-        self.trans_cost_ratio * trans_cost  - self.hold_cost_ratio * hold_cost 
+        trans_cost = torch.cat((
+            torch.zeros(1, device=weight_pred.device),
+            torch.sum(torch.abs(weight_pred[1:] - weight_pred[:-1]), dim=1)
+        )) 
+        hold_cost = torch.sum(torch.abs(weight_pred), dim=1)
+        final_returns = torch.sum(return_data * weight_pred, dim=1) - \
+            self.trans_cost_ratio * trans_cost - self.hold_cost_ratio * hold_cost
 
         # Minimize the negative mean of final returns divided by standard deviation
-        return -torch.mean(final_returns) / (torch.std(final_returns)+1e-8)
+        return -torch.mean(final_returns) / (torch.std(final_returns) + 1e-8)
 
 
 class CNN_Block(nn.Module):

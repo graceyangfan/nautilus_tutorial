@@ -11,7 +11,7 @@ from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from finml.models.CNNTransformer.models import CNNTransformer
-from finml.data.datamodule import ReturnBasedDataModule
+from finml.data.datamodule import ReturnBasedDataset
 from finml.evaluation.cross_validation import PurgedKFold
 from finml.data.handler import StandardNorm
 
@@ -142,12 +142,12 @@ def train_folds(X, returns, event_times, args):
         returns_train, returns_test = returns.loc[train_indices], returns.loc[val_indices]
 
         # Create and transform training dataset
-        data_module = ReturnBasedDataModule(
+        data_module = ReturnBasedDataset(
             x_train=x_train,
             returns_train=returns_train,
             x_test=x_test,
             returns_test=returns_test,
-            sequence_len=args.sequence_len,
+            is_classification=args.is_classification,
             x_handler=args.x_handler,
             save_prefix=args.save_prefix,
             batch_size=args.batch_size,

@@ -1,0 +1,17 @@
+[package]
+name = "finml_extension"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "_finml_extension"
+crate-type = ["cdylib"]
+
+
+[dependencies]
+pyo3 = {version = "*", features = ["extension-module"]}
+pyo3-polars = {version = "0.11", features = ["derive"]}
+polars = {version = "0.37", features = ["dynamic_group_by","performant", "lazy", "dtype-array", "array_count","log","nightly"]}
+serde = {version = "*", features=["derive"]}
+hashbrown = {version = "0.14.2", features=["nightly"]}

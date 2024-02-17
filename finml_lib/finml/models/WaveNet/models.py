@@ -2,9 +2,30 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from torchmetrics.functional.regression import concordance_corrcoef
+from torchmetrics.classification import  MulticlassAUROC
 
-import torch
-import torch.nn as nn
+class AUCMetric:
+    def __call__(self, preds, target):
+        """
+        Compute AUC (Area Under the Curve) metric for binary or multiclass classification.
+
+        Args:
+            preds (torch.Tensor): Model predictions (logits).
+            target (torch.Tensor): Ground truth labels.
+
+        Returns:
+            torch.Tensor: AUC score.
+        """
+        # Apply softmax to convert logits to probabilities
+        preds = torch.nn.functional.softmax(preds, dim=-1)
+        num_classes = preds.size(-1)
+
+        # Choose the appropriate metric based on the number of classes
+        metric = MulticlassAUROC(num_classes=num_classes, average="macro", thresholds=None)
+   
+        # Compute and return the AUC score
+        return -metric(preds, target)
+
 
 class FocalLoss(nn.Module):
     """
@@ -248,7 +269,8 @@ class WaveNet(pl.LightningModule):
         self.is_classification = args.is_classification
 
         self.input_conv = CausalConv1d(self.input_dim, self.residual_dim, kernel_size=3)
-
+        self.use_normalization = args.use_normalization
+        self.normalization = nn.InstanceNorm1d(self.residual_dim,affine=True)
         self.dilated_stacks = nn.ModuleList(
             [DilatedStack(self.residual_dim, self.skip_dim, self.dilation_depth)
              for cycle in range(self.dilation_cycles)]
@@ -262,7 +284,7 @@ class WaveNet(pl.LightningModule):
         # Criterion 1 represents almost the same
         if self.is_classification:
             self.loss_func = FocalLoss(gamma=1)
-            self.criterion = FocalLoss(gamma=1) 
+            self.criterion = AUCMetric()
         else:
             self.loss_func = ConcordanceLoss(args.scale)
             self.criterion = concordance_corrcoef
@@ -281,8 +303,9 @@ class WaveNet(pl.LightningModule):
         x = x.permute(0, 2, 1)
 
         # [batch_size, residual_dim, seq_len]
-        x = self.input_conv(x)  
-
+        x = self.input_conv(x) 
+        if self.use_normalization:
+            x = self.normalization(x)
         skip_connections = []
 
         for cycle in self.dilated_stacks:
