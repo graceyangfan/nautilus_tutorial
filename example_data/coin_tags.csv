@@ -1,0 +1,380 @@
+,symbol,baseAssetName,tags
+0,BTCUSDT,Bitcoin,"['pow', 'mining-zone']"
+1,1INCHUSDT,1inch,['defi']
+2,AAVEUSDT,Aave,['defi']
+3,ACMUSDT,AC Milan Fan Token,['fan_token']
+4,ADAUSDT,Cardano,"['Layer1_Layer2', 'pos', 'mining-zone']"
+5,AKROUSDT,Akropolis,"['Monitoring', 'Polkadot', 'defi']"
+6,ALGOUSDT,Algorand,"['Layer1_Layer2', 'mining-zone', 'pos']"
+7,ALICEUSDT,My Neighbor Alice,"['Gaming', 'innovation-zone', 'NFT', 'Metaverse', 'Launchpool', 'Seed']"
+8,ALPACAUSDT,Alpaca Finance,"['defi', 'BSC', 'bnbchain']"
+9,ALPHAUSDT,Stella,"['defi', 'innovation-zone', 'Launchpad', 'Launchpool', 'Seed']"
+10,ANKRUSDT,Ankr,"['liquid_staking', 'pow', 'pos', 'defi']"
+11,ANTUSDT,Aragon,"['Monitoring', 'pos', 'Infrastructure']"
+12,ARDRUSDT,Ardor,"['Layer1_Layer2', 'mining-zone', 'pos']"
+13,ARPAUSDT,ARPA Network,"['Layer1_Layer2', 'Infrastructure']"
+14,ARUSDT,Arweave,['storage-zone']
+15,ASRUSDT,AS Roma Fan Token,"['fan_token', 'Launchpool', 'bnbchain', 'innovation-zone', 'Seed']"
+16,ATAUSDT,Automata,"['Infrastructure', 'Launchpool', 'Polkadot', 'innovation-zone', 'Seed']"
+17,ATMUSDT,Atlético de Madrid Fan Token,"['fan_token', 'Launchpool', 'bnbchain', 'innovation-zone', 'Seed']"
+18,ATOMUSDT,Cosmos,"['Layer1_Layer2', 'pos']"
+19,AUDIOUSDT,Audius,['NFT']
+20,AVAUSDT,AVA,[]
+21,AVAXUSDT,Avalanche,"['Layer1_Layer2', 'pos']"
+22,AXSUSDT,Axie Infinity,"['Gaming', 'Metaverse', 'Launchpad', 'NFT']"
+23,BADGERUSDT,Badger DAO,"['defi', 'innovation-zone', 'Seed']"
+24,BAKEUSDT,BakeryToken,"['defi', 'bnbchain', 'innovation-zone', 'NFT', 'Seed']"
+25,BALUSDT,Balancer,['defi']
+26,BANDUSDT,BAND,"['Infrastructure', 'pos', 'Launchpad', 'defi']"
+27,BATUSDT,Basic Attention Token,['Infrastructure']
+28,BCHUSDT,Bitcoin Cash,"['pow', 'mining-zone']"
+29,BELUSDT,Bella Protocol,"['defi', 'innovation-zone', 'BSC', 'Launchpool', 'bnbchain', 'Seed']"
+30,BLZUSDT,Bluzelle,['storage-zone']
+31,BNBDOWNUSDT,BNBDOWN,['ETF']
+32,BNBUPUSDT,BNBUP,['ETF']
+33,BNTUSDT,Bancor,['defi']
+34,BONDUSDT,BarnBridge,"['Monitoring', 'defi']"
+35,BTCDOWNUSDT,BTCDOWN,['ETF']
+36,BTCUPUSDT,BTCUP,['ETF']
+37,BURGERUSDT,BurgerCities,"['Metaverse', 'Gaming', 'innovation-zone', 'bnbchain', 'Seed']"
+38,C98USDT,Coin98,"['defi', 'bnbchain', 'Launchpad']"
+39,CAKEUSDT,PancakeSwap,"['defi', 'BSC', 'bnbchain']"
+40,CELOUSDT,Celo,"['Layer1_Layer2', 'defi']"
+41,CELRUSDT,Celer Network,"['Layer1_Layer2', 'Launchpad']"
+42,CFXUSDT,Conflux Network,"['Layer1_Layer2', 'pow']"
+43,CHRUSDT,Chromia,"['Layer1_Layer2', 'NFT']"
+44,CHZUSDT,Chiliz,"['Layer1_Layer2', 'fan_token', 'NFT']"
+45,CKBUSDT,CKB,"['Layer1_Layer2', 'pow']"
+46,CLVUSDT,Clover Finance,"['Infrastructure', 'pos']"
+47,COMPUSDT,Compound,['defi']
+48,COSUSDT,Contentos,[]
+49,COTIUSDT,COTI,['defi']
+50,CRVUSDT,Curve,['defi']
+51,CTKUSDT,Shentu,"['Launchpool', 'pos', 'bnbchain', 'Infrastructure']"
+52,CTSIUSDT,Cartesi,"['Layer1_Layer2', 'pos', 'Launchpad']"
+53,CTXCUSDT,Cortex,"['Layer1_Layer2', 'mining-zone', 'pow', 'AI']"
+54,CVCUSDT,Civic,['Infrastructure']
+55,DASHUSDT,Dash,"['pow', 'pos', 'mining-zone']"
+56,DATAUSDT,Streamr,['Infrastructure']
+57,DCRUSDT,Decred,"['Layer1_Layer2', 'pos', 'mining-zone', 'pow']"
+58,DEGOUSDT,Dego Finance,"['defi', 'innovation-zone', 'bnbchain', 'Launchpad', 'NFT', 'Seed']"
+59,DENTUSDT,DENT,['Infrastructure']
+60,DEXEUSDT,DeXe,"['defi', 'innovation-zone', 'Seed']"
+61,DGBUSDT,DigiByte,"['pow', 'mining-zone']"
+62,DIAUSDT,DIA,"['Infrastructure', 'pos', 'mining-zone', 'defi']"
+63,DOCKUSDT,DOCK,['Infrastructure']
+64,DODOUSDT,DODO,"['defi', 'Launchpool', 'bnbchain', 'innovation-zone', 'Seed']"
+65,DOGEUSDT,Dogecoin,"['pow', 'mining-zone', 'Meme']"
+66,DOTUSDT,Polkadot,"['Layer1_Layer2', 'Polkadot', 'pos']"
+67,DREPUSDT,DREP,"['Monitoring', 'pos', 'Layer1_Layer2']"
+68,DUSKUSDT,Dusk,['Infrastructure']
+69,EGLDUSDT,MultiversX,"['Layer1_Layer2', 'Launchpad', 'pos']"
+70,ENJUSDT,Enjin Coin,"['Gaming', 'NFT']"
+71,EOSUSDT,EOS,"['Layer1_Layer2', 'pos']"
+72,ERNUSDT,Ethernity Chain,"['NFT', 'innovation-zone', 'Seed']"
+73,ETCUSDT,Ethereum Classic,"['Layer1_Layer2', 'mining-zone', 'pow']"
+74,ETHDOWNUSDT,ETHDOWN,['ETF']
+75,ETHUPUSDT,ETHUP,['ETF']
+76,EURUSDT,Euro,[]
+77,FARMUSDT,Harvest Finance,['defi']
+78,FETUSDT,Fetch.ai,"['Infrastructure', 'pos', 'Launchpad', 'AI']"
+79,FILUSDT,Filecoin,['storage-zone']
+80,FIOUSDT,FIO Protocol,"['Infrastructure', 'NFT', 'pos']"
+81,FIROUSDT,Firo,['Monitoring']
+82,FISUSDT,Stafi,"['liquid_staking', 'innovation-zone', 'defi', 'Seed']"
+83,FLMUSDT,Flamingo,"['defi', 'innovation-zone', 'Launchpool', 'Seed']"
+84,FLOWUSDT,Flow,['Layer1_Layer2']
+85,FORTHUSDT,Ampleforth Governance Token,['defi']
+86,FTMUSDT,Fantom,"['Layer1_Layer2', 'mining-zone', 'pos']"
+87,FTTUSDT,FTX Token,['Monitoring']
+88,FUNUSDT,FunToken,[]
+89,GRTUSDT,The Graph,"['Infrastructure', 'AI']"
+90,GTCUSDT,Gitcoin,['Infrastructure']
+91,HARDUSDT,Kava Lend,"['defi', 'Launchpool', 'innovation-zone', 'Seed']"
+92,HBARUSDT,Hedera Hashgraph,"['Layer1_Layer2', 'pos']"
+93,HIVEUSDT,Hive,"['Layer1_Layer2', 'mining-zone', 'pos']"
+94,HOTUSDT,Holo,"['Layer1_Layer2', 'storage-zone']"
+95,ICPUSDT,Internet Computer,['Layer1_Layer2']
+96,ICXUSDT,ICON,"['Layer1_Layer2', 'pos']"
+97,INJUSDT,Injective,"['Layer1_Layer2', 'pos', 'BSC', 'Launchpad', 'bnbchain', 'defi']"
+98,IOSTUSDT,IOST,"['Layer1_Layer2', 'pos']"
+99,IOTAUSDT,MIOTA,"['Layer1_Layer2', 'pow']"
+100,IOTXUSDT,IoTeX,"['Layer1_Layer2', 'pos', 'Infrastructure']"
+101,IRISUSDT,IRISnet,['']
+102,JSTUSDT,JUST,['defi']
+103,JUVUSDT,Juventus Fan Token,"['fan_token', 'innovation-zone', 'bnbchain', 'Launchpool', 'Seed']"
+104,KAVAUSDT,Kava,"['Layer1_Layer2', 'pos', 'mining-zone', 'Launchpad', 'defi']"
+105,KEYUSDT,Selfkey,['Infrastructure']
+106,KLAYUSDT,Klaytn,"['Layer1_Layer2', 'Launchpool', 'defi']"
+107,KMDUSDT,Komodo,"['pow', 'mining-zone']"
+108,KNCUSDT,KyberNetwork,['defi']
+109,KSMUSDT,Kusama,"['Layer1_Layer2', 'pos', 'Polkadot']"
+110,LINAUSDT,Linear,"['Monitoring', 'bnbchain', 'defi']"
+111,LINKUSDT,ChainLink,['Infrastructure']
+112,LITUSDT,Litentry,"['Infrastructure', 'innovation-zone', 'Polkadot', 'Launchpool', 'defi', 'Seed']"
+113,LPTUSDT,Livepeer,"['Infrastructure', 'pos']"
+114,LRCUSDT,Loopring,['defi']
+115,LSKUSDT,Lisk,"['Layer1_Layer2', 'mining-zone', 'pos']"
+116,LTCUSDT,Litecoin,"['pow', 'mining-zone']"
+117,LTOUSDT,LTO Network,['Layer1_Layer2']
+118,LUNAUSDT,Terra,"['Layer1_Layer2', 'pos', 'mining-zone', 'defi']"
+119,MANAUSDT,Decentraland,"['Metaverse', 'Gaming', 'NFT']"
+120,MASKUSDT,Mask Network,['Infrastructure']
+121,MATICUSDT,Polygon,"['Layer1_Layer2', 'Launchpad', 'pos']"
+122,MBLUSDT,MovieBloc,[]
+123,MDTUSDT,Measurable Data Token,"['Infrastructure', 'AI']"
+124,MDXUSDT,Mdex,"['Monitoring', 'BSC', 'bnbchain', 'innovation-zone', 'defi']"
+125,MINAUSDT,Mina,"['Layer1_Layer2', 'pos']"
+126,MKRUSDT,Maker,['defi']
+127,MLNUSDT,Enzyme,"['Monitoring', 'defi']"
+128,MTLUSDT,Metal,['Infrastructure']
+129,NEARUSDT,NEAR Protocol,"['Layer1_Layer2', 'pos']"
+130,NEOUSDT,NEO,"['Layer1_Layer2', 'mining-zone', 'pos']"
+131,NMRUSDT,Numeraire,"['defi', 'AI']"
+132,NULSUSDT,Nuls,"['Layer1_Layer2', 'mining-zone', 'pos']"
+133,OCEANUSDT,Ocean Protocol,"['Infrastructure', 'AI']"
+134,OGNUSDT,OriginToken,['NFT']
+135,OGUSDT,OG Fan Token,"['fan_token', 'BSC', 'Launchpool', 'bnbchain', 'innovation-zone', 'Seed']"
+136,OMGUSDT,OMG Network,"['Monitoring', 'pos', 'Layer1_Layer2']"
+137,OMUSDT,MANTRA,"['defi', 'innovation-zone', 'Seed']"
+138,ONEUSDT,Harmony,"['Layer1_Layer2', 'mining-zone', 'Launchpad', 'pos']"
+139,ONGUSDT,Ontology Gas,[]
+140,ONTUSDT,Ontology,"['Layer1_Layer2', 'pos', 'mining-zone', 'BSC', 'bnbchain', 'pow']"
+141,ORNUSDT,Orion Protocol,[]
+142,OXTUSDT,Orchid,['Infrastructure']
+143,PAXGUSDT,PAX Gold,[]
+144,PERPUSDT,Perpetual Protocol,"['defi', 'innovation-zone', 'Seed']"
+145,PHAUSDT,Phala.Network,"['Infrastructure', 'Polkadot', 'innovation-zone', 'Seed']"
+146,PNTUSDT,pNetwork,"['Monitoring', 'defi']"
+147,POLSUSDT,Polkastarter,"['defi', 'BSC', 'bnbchain', 'innovation-zone', 'Seed']"
+148,PONDUSDT,Marlin,"['defi', 'innovation-zone', 'Seed']"
+149,PSGUSDT,Paris Saint-Germain Fan Token,"['fan_token', 'BSC', 'Launchpool', 'bnbchain', 'innovation-zone', 'Seed']"
+150,PUNDIXUSDT,Pundi X,[]
+151,QNTUSDT,Quant,['Infrastructure']
+152,QTUMUSDT,Qtum,"['Layer1_Layer2', 'mining-zone', 'pos']"
+153,QUICKUSDT,QuickSwap,['defi']
+154,RAYUSDT,Raydium,['defi']
+155,REEFUSDT,Reef,"['Monitoring', 'defi', 'Polkadot', 'Launchpool', 'innovation-zone', 'Layer1_Layer2']"
+156,RIFUSDT,Rootstock Infrastructure Framework,"['Layer1_Layer2', 'storage-zone', 'pow', 'defi']"
+157,RLCUSDT,iExecRLC,"['Infrastructure', 'AI']"
+158,ROSEUSDT,Oasis Network,['Layer1_Layer2']
+159,RSRUSDT,Reserve Rights,['defi']
+160,RUNEUSDT,THORChain,['defi']
+161,RVNUSDT,Ravencoin,"['pow', 'mining-zone']"
+162,SANDUSDT,The Sandbox,"['Metaverse', 'Gaming', 'Launchpad', 'NFT']"
+163,SCUSDT,Siacoin,"['storage-zone', 'pow', 'mining-zone']"
+164,SFPUSDT,SafePal,"['Infrastructure', 'Launchpad', 'bnbchain', 'BSC']"
+165,SHIBUSDT,SHIBA INU,['Meme']
+166,SKLUSDT,SKALE Network,['Layer1_Layer2']
+167,SLPUSDT,Smooth Love Potion,"['Gaming', 'NFT', 'Metaverse', 'innovation-zone', 'Seed']"
+168,SNXUSDT,Synthetix Network Token,['defi']
+169,SOLUSDT,Solana,"['Layer1_Layer2', 'pos', 'mining-zone']"
+170,STMXUSDT,StormX,[]
+171,STORJUSDT,Storj,['storage-zone']
+172,STPTUSDT,Standard Tokenization Protocol,[]
+173,STRAXUSDT,Stratis,"['Layer1_Layer2', 'pos']"
+174,STXUSDT,Stacks,"['Layer1_Layer2', 'mining-zone', 'storage-zone', 'pow']"
+175,SUNUSDT,SUN,"['defi', 'innovation-zone', 'Seed']"
+176,SUPERUSDT,SuperFarm,"['NFT', 'defi', 'innovation-zone', 'Seed']"
+177,SUSHIUSDT,Sushi,"['defi', 'innovation-zone']"
+178,SXPUSDT,Solar,['Layer1_Layer2']
+179,TFUELUSDT,Theta Fuel,[]
+180,THETAUSDT,Theta Token,"['NFT', 'mining-zone']"
+181,TKOUSDT,Tokocrypto,['Launchpad']
+182,TLMUSDT,Alien Worlds,"['Gaming', 'Launchpool', 'BSC', 'bnbchain', 'Metaverse']"
+183,TRBUSDT,Tellor Tributes,"['Infrastructure', 'defi', 'pos', 'mining-zone', 'pow']"
+184,TROYUSDT,Troy,['Launchpad']
+185,TRUUSDT,TrueFi,"['defi', 'innovation-zone', 'Seed']"
+186,TRXUSDT,TRON,"['Layer1_Layer2', 'mining-zone', 'pos']"
+187,TUSDUSDT,TrueUSD,['stablecoin']
+188,TWTUSDT,Trust Wallet Token,"['Infrastructure', 'BSC', 'bnbchain']"
+189,UMAUSDT,UMA,['defi']
+190,UNFIUSDT,Unifi Protocol DAO,"['defi', 'innovation-zone', 'BSC', 'Launchpool', 'bnbchain', 'Seed']"
+191,UNIUSDT,Uniswap,['defi']
+192,USDCUSDT,USD Coin,['stablecoin']
+193,UTKUSDT,xMoney,['']
+194,VETUSDT,VeChain,"['Layer1_Layer2', 'mining-zone', 'pos']"
+195,VITEUSDT,VITE,"['Layer1_Layer2', 'mining-zone', 'pos']"
+196,VTHOUSDT,VeThor Token,[]
+197,WANUSDT,Wanchain,"['Layer1_Layer2', 'mining-zone', 'pos']"
+198,WAVESUSDT,Waves,"['Layer1_Layer2', 'mining-zone', 'pos']"
+199,WINGUSDT,Wing Token,"['defi', 'innovation-zone', 'Launchpool', 'Seed']"
+200,WINUSDT,WINkLink,['Infrastructure']
+201,WNXMUSDT,Wrapped NXM,"['defi', 'innovation-zone', 'Seed']"
+202,WRXUSDT,WazirX,"['Monitoring', 'Launchpad']"
+203,XEMUSDT,NEM,"['Monitoring', 'mining-zone', 'pos', 'Layer1_Layer2']"
+204,XLMUSDT,Stellar Lumens,"['Layer1_Layer2', 'mining-zone']"
+205,XMRUSDT,Monero,"['Monitoring', 'pow']"
+206,XRPUSDT,Ripple,['Layer1_Layer2']
+207,XTZUSDT,Tezos,"['Layer1_Layer2', 'mining-zone', 'pos']"
+208,XVGUSDT,Verge,"['pow', 'mining-zone']"
+209,XVSUSDT,Venus,"['defi', 'Launchpool', 'bnbchain']"
+210,YFIUSDT,yearn.finance,['defi']
+211,ZECUSDT,Zcash,"['Monitoring', 'pow']"
+212,ZENUSDT,Horizen,"['Monitoring', 'pow']"
+213,ZILUSDT,Zilliqa,"['Layer1_Layer2', 'pow']"
+214,ZRXUSDT,0x,['defi']
+215,BNBUSDT,BNB,"['Layer1_Layer2', 'BSC', 'pos', 'bnbchain']"
+216,ETHUSDT,Ethereum,"['Layer1_Layer2', 'pos', 'mining-zone']"
+217,RENUSDT,Ren,"['Monitoring', 'mining-zone', 'pos', 'defi']"
+218,NKNUSDT,NKN,"['Infrastructure', 'mining-zone', 'pow']"
+219,BARUSDT,FC Barcelona Fan Token BAR,"['fan_token', 'innovation-zone', 'Seed']"
+220,MBOXUSDT,MOBOX,"['Gaming', 'Launchpool', 'BSC', 'bnbchain', 'NFT', 'Metaverse', 'defi']"
+221,FORUSDT,ForTube,"['defi', 'bnbchain', 'innovation-zone', 'Seed']"
+222,REQUSDT,Request Network,[]
+223,GHSTUSDT,Aavegotchi,"['Gaming', 'innovation-zone', 'defi', 'NFT', 'Metaverse', 'Seed']"
+224,WAXPUSDT,WAX,"['NFT', 'Layer1_Layer2', 'defi', 'Gaming']"
+225,GNOUSDT,Gnosis,['Layer1_Layer2']
+226,XECUSDT,eCash,[]
+227,ELFUSDT,aelf,"['Monitoring', 'mining-zone', 'pos', 'Layer1_Layer2']"
+228,DYDXUSDT,dYdX,['defi']
+229,IDEXUSDT,IDEX,['defi']
+230,VIDTUSDT,VIDT DAO,"['Layer1_Layer2', 'innovation-zone', 'Seed']"
+231,USDPUSDT,Pax Dollar,['stablecoin']
+232,GALAUSDT,Gala,"['Gaming', 'bnbchain', 'NFT']"
+233,ILVUSDT,Illuvium,"['Gaming', 'Metaverse']"
+234,YGGUSDT,Yield Guild Games,['Gaming']
+235,SYSUSDT,Syscoin,"['Layer1_Layer2', 'pos', 'mining-zone', 'pow']"
+236,DFUSDT,dForce,"['defi', 'innovation-zone', 'Seed']"
+237,FIDAUSDT,Bonfida,['defi']
+238,FRONTUSDT,Frontier,"['defi', 'innovation-zone', 'Seed']"
+239,CVPUSDT,PowerPool,"['defi', 'innovation-zone', 'Seed']"
+240,AGLDUSDT,Adventure Gold,"['NFT', 'innovation-zone', 'Gaming', 'Seed']"
+241,RADUSDT,Radworks,['Infrastructure']
+242,BETAUSDT,Beta Finance,"['Monitoring', 'Launchpad', 'defi']"
+243,RAREUSDT,SuperRare,['NFT']
+244,LAZIOUSDT,Lazio Fan Token,"['fan_token', 'Launchpad']"
+245,CHESSUSDT,Tranchess,"['liquid_staking', 'innovation-zone', 'defi', 'Seed']"
+246,ADXUSDT,AdEx,['Infrastructure']
+247,AUCTIONUSDT,Auction,"['defi', 'innovation-zone', 'Seed']"
+248,DARUSDT,Mines of Dalarnia,"['Gaming', 'BSC', 'NFT', 'bnbchain', 'Metaverse', 'Launchpool']"
+249,BNXUSDT,BinaryX,"['Gaming', 'innovation-zone', 'NFT', 'bnbchain', 'Seed']"
+250,MOVRUSDT,Moonriver,['Layer1_Layer2']
+251,CITYUSDT,Manchester City Fan Token,"['fan_token', 'Launchpool']"
+252,ENSUSDT,Ethereum Name Service,['Infrastructure']
+253,KP3RUSDT,Keep3rV1,"['Monitoring', 'innovation-zone', 'defi', 'Infrastructure']"
+254,QIUSDT,BENQI,"['liquid_staking', 'Launchpool', 'defi']"
+255,PORTOUSDT,FC Porto Fan Token,"['fan_token', 'Launchpad']"
+256,POWRUSDT,Powerledger,[]
+257,VGXUSDT,Voyager Token,['Monitoring']
+258,JASMYUSDT,JasmyCoin,"['Monitoring', 'Infrastructure']"
+259,AMPUSDT,AMP,['defi']
+260,PLAUSDT,PlayDapp,['Gaming']
+261,PYRUSDT,Vulcan Forged PYR,"['Gaming', 'Metaverse', 'NFT']"
+262,RNDRUSDT,Render Token,['Infrastructure']
+263,ALCXUSDT,Alchemix,['defi']
+264,SANTOSUSDT,Santos FC Fan Token,"['fan_token', 'Launchpool']"
+265,BICOUSDT,Biconomy,['Infrastructure']
+266,FLUXUSDT,Flux,"['Infrastructure', 'pow', 'Layer1_Layer2']"
+267,FXSUSDT,Frax Share,"['liquid_staking', 'defi']"
+268,VOXELUSDT,Voxies,"['Gaming', 'Launchpad']"
+269,HIGHUSDT,Highstreet,"['Metaverse', 'NFT', 'Launchpool']"
+270,CVXUSDT,Convex Finance,"['defi', 'innovation-zone', 'Seed']"
+271,PEOPLEUSDT,ConstitutionDAO,"['innovation-zone', 'Meme', 'Seed']"
+272,OOKIUSDT,OokiDAO,"['Monitoring', 'defi']"
+273,SPELLUSDT,Spell Token,['defi']
+274,JOEUSDT,JOE,['defi']
+275,ACHUSDT,Alchemy Pay,[]
+276,IMXUSDT,ImmutableX,"['Layer1_Layer2', 'NFT', 'Gaming']"
+277,GLMRUSDT,Glimmer,"['Layer1_Layer2', 'Polkadot']"
+278,LOKAUSDT,League of Kingdoms,"['Gaming', 'Launchpad']"
+279,SCRTUSDT,Secret,"['Layer1_Layer2', 'pos']"
+280,API3USDT,API3,['Infrastructure']
+281,BTTCUSDT,BitTorrent,"['storage-zone', 'Launchpad', 'pos']"
+282,ACAUSDT,Acala Token,"['defi', 'Polkadot', 'Layer1_Layer2']"
+283,XNOUSDT,Nano,['']
+284,WOOUSDT,WOO Network,['defi']
+285,ALPINEUSDT,Alpine F1 Team Fan Token,"['fan_token', 'Launchpad']"
+286,TUSDT,Threshold,['Infrastructure']
+287,ASTRUSDT,Astar,"['Layer1_Layer2', 'Polkadot', 'Infrastructure']"
+288,GMTUSDT,Green Metaverse Token,"['NFT', 'Launchpad']"
+289,KDAUSDT,Kadena,"['Layer1_Layer2', 'pow']"
+290,APEUSDT,ApeCoin,['NFT']
+291,BSWUSDT,Biswap,"['defi', 'BSC', 'bnbchain', 'innovation-zone', 'Seed']"
+292,BIFIUSDT,Beefy.Finance,"['defi', 'bnbchain', 'innovation-zone', 'Seed']"
+293,MULTIUSDT,Multichain,"['Monitoring', 'defi']"
+294,STEEMUSDT,Steem,['']
+295,MOBUSDT,MobileCoin,['Monitoring']
+296,NEXOUSDT,Nexo,[]
+297,REIUSDT,REI Network,['Layer1_Layer2']
+298,GALUSDT,Galxe,"['Infrastructure', 'innovation-zone', 'Launchpool', 'Seed']"
+299,LDOUSDT,Lido DAO,"['liquid_staking', 'defi']"
+300,EPXUSDT,Ellipsis,"['defi', 'innovation-zone', 'bnbchain', 'Seed']"
+301,OPUSDT,Optimism,['Layer1_Layer2']
+302,LEVERUSDT,LeverFi,"['defi', 'innovation-zone', 'Seed']"
+303,STGUSDT,Stargate Finance,"['defi', 'innovation-zone', 'Seed']"
+304,LUNCUSDT,Terra Classic,"['Layer1_Layer2', 'pos', 'defi']"
+305,GMXUSDT,GMX,"['defi', 'innovation-zone']"
+306,POLYXUSDT,Polymesh,"['Layer1_Layer2', 'Infrastructure', 'pos']"
+307,APTUSDT,Aptos,['Layer1_Layer2']
+308,OSMOUSDT,Osmosis,"['defi', 'pos', 'Layer1_Layer2']"
+309,HFTUSDT,Hashflow,"['defi', 'Launchpool', 'Seed', 'innovation-zone']"
+310,PHBUSDT,Phoenix,"['Layer1_Layer2', 'AI']"
+311,HOOKUSDT,Hooked Protocol,"['Launchpad', 'innovation-zone', 'bnbchain', 'Infrastructure', 'Seed']"
+312,MAGICUSDT,Magic,"['Gaming', 'NFT', 'innovation-zone', 'Metaverse', 'Seed']"
+313,HIFIUSDT,Hifi Finance,['defi']
+314,RPLUSDT,Rocket Pool,"['liquid_staking', 'innovation-zone', 'defi', 'Seed']"
+315,PROSUSDT,Prosper,"['defi', 'innovation-zone', 'Seed']"
+316,AGIXUSDT,SingularityNET Token,['AI']
+317,GNSUSDT,Gains Network,"['defi', 'innovation-zone', 'Seed']"
+318,SYNUSDT,Synapse,"['defi', 'innovation-zone', 'Seed']"
+319,VIBUSDT,Viberate,[]
+320,SSVUSDT,SSV Token,['Infrastructure']
+321,LQTYUSDT,Liquity,"['defi', 'innovation-zone', 'Seed']"
+322,AMBUSDT,AirDAO,"['Monitoring', 'pos', 'Layer1_Layer2']"
+323,USTCUSDT,TerraClassicUSD,['defi']
+324,GASUSDT,NeoGas,[]
+325,GLMUSDT,Golem,['Infrastructure']
+326,PROMUSDT,Prometeus,"['NFT', 'Seed']"
+327,QKCUSDT,QuarkChain,"['Layer1_Layer2', 'pos', 'mining-zone', 'pow']"
+328,UFTUSDT,UniLend,"['defi', 'innovation-zone', 'Seed']"
+329,IDUSDT,Space ID,"['Infrastructure', 'innovation-zone', 'bnbchain', 'Launchpad', 'Seed']"
+330,ARBUSDT,Arbitrum,['Layer1_Layer2']
+331,LOOMUSDT,Loom Network,"['Monitoring', 'Layer1_Layer2']"
+332,OAXUSDT,openANX,['Monitoring']
+333,RDNTUSDT,Radiant Capital,"['defi', 'Launchpool', 'Seed', 'innovation-zone']"
+334,WBTCUSDT,Wrapped Bitcoin,[]
+335,EDUUSDT,Open Campus,['Launchpad']
+336,SUIUSDT,Sui,"['Layer1_Layer2', 'Launchpool', 'pos']"
+337,AERGOUSDT,Aergo,['']
+338,PEPEUSDT,Pepe,"['Meme', 'innovation-zone', 'Seed']"
+339,FLOKIUSDT,FLOKI,"['Meme', 'innovation-zone', 'Gaming', 'Metaverse', 'Seed']"
+340,ASTUSDT,AirSwap,['defi']
+341,SNTUSDT,Status,['ALTS']
+342,COMBOUSDT,COMBO,"['Gaming', 'bnbchain', 'NFT', 'mining-zone', 'Metaverse', 'Layer1_Layer2']"
+343,MAVUSDT,Maverick Protocol,"['defi', 'Launchpool']"
+344,PENDLEUSDT,Pendle,"['defi', 'innovation-zone', 'Launchpool', 'Seed']"
+345,ARKMUSDT,Arkham,"['Infrastructure', 'Launchpad', 'Seed', 'innovation-zone']"
+346,WBETHUSDT,Wrapped Beacon ETH (WBETH),['liquid_staking']
+347,WLDUSDT,Worldcoin,"['AI', 'Infrastructure']"
+348,FDUSDUSDT,First Digital USD,['stablecoin']
+349,SEIUSDT,Sei,"['Layer1_Layer2', 'Seed', 'Launchpool']"
+350,CYBERUSDT,CyberConnect,"['Infrastructure', 'Seed', 'Launchpool']"
+351,ARKUSDT,Ark,"['Monitoring', 'pos', 'Layer1_Layer2']"
+352,CREAMUSDT,Cream Finance,"['Monitoring', 'defi']"
+353,GFTUSDT,Gifto,"['Monitoring', 'Launchpad']"
+354,IQUSDT,IQ,['AI']
+355,NTRNUSDT,Neutron,"['Layer1_Layer2', 'Seed']"
+356,TIAUSDT,Celestia,"['Infrastructure', 'Seed']"
+357,MEMEUSDT,Memecoin,"['Meme', 'Seed', 'Launchpool']"
+358,ORDIUSDT,ORDI,"['Meme', 'Seed']"
+359,BEAMXUSDT,Beam (Formerly Merit Circle),"['Gaming', 'Launchpool']"
+360,PIVXUSDT,PIVX,['mining-zone']
+361,VICUSDT,Viction,['Layer1_Layer2']
+362,BLURUSDT,Blur,"['NFT', 'Seed']"
+363,VANRYUSDT,Vanar,"['Layer1_Layer2', 'Metaverse', 'NFT', 'Seed']"
+364,AEURUSDT,Anchored EUR,['stablecoin']
+365,JTOUSDT,JITO,"['Seed', 'liquid_staking', 'defi']"
+366,1000SATSUSDT,1000*SATS (Ordinals),"['Seed', 'Meme']"
+367,BONKUSDT,Bonk,"['Meme', 'Seed']"
+368,ACEUSDT,Fusionist,"['Gaming', 'Launchpool', 'Seed']"
+369,NFPUSDT,NFPrompt Token,"['AI', 'Seed', 'NFT', 'newListing', 'Launchpool']"
+370,AIUSDT,Sleepless AI,"['AI', 'Seed', 'Launchpool', 'Gaming', 'newListing']"
+371,XAIUSDT,Xai,"['Gaming', 'newListing', 'Launchpool', 'Seed']"
+372,MANTAUSDT,Manta,"['Layer1_Layer2', 'newListing', 'Launchpool', 'Seed']"
+373,ALTUSDT,AltLayer,"['Infrastructure', 'Launchpool', 'newListing', 'Seed']"
+374,JUPUSDT,Jupiter,"['defi', 'newListing', 'Seed']"
+375,PYTHUSDT,Pyth Network,"['Infrastructure', 'Seed', 'newListing']"
+376,RONINUSDT,Ronin,"['Gaming', 'Layer1_Layer2', 'Seed', 'newListing']"
+377,DYMUSDT,Dymension,"['Infrastructure', 'Layer1_Layer2', 'Seed', 'newListing']"
+378,PIXELUSDT,Pixels,"['Gaming', 'newListing', 'Launchpool', 'Seed']"

@@ -4,18 +4,61 @@ import polars as pl
 import numpy as np 
 
 class Expression(metaclass=ABCMeta):
-    """Expression base class"""
+    """Expression base class
+
+    This class serves as the base class for all expressions in the library. It defines common
+    methods and operators that can be used to build complex expressions.
+
+    Attributes:
+        _expr (pl.Expr): The underlying expression object.
+        _expr_update (bool): Flag indicating whether the expression has been updated.
+        _batch_update (bool): Flag indicating whether batch update is enabled.
+        _base_columns (List[str]): List of base columns used in the expression.
+
+    """
 
     _expr: pl.Expr 
     _expr_update: bool = False 
+    _batch_update: bool = False 
+    _base_columns: List = ["symbol","datetime"] 
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        raise NotImplementedError("This function must be implemented in your newly defined expression")
-
-    def batch_update(self, data: pl.LazyFrame) -> Union[pl.LazyFrame, float, int]:
-        """This function performance real computing on data, users must define it by themselves
         """
-        return data.select(self.expr)
+        Get the expression value.
+
+        Returns:
+            Union[pl.Expr, float, int]: The expression value.
+        """
+        raise NotImplementedError("This function should be implemented in your newly defined expression")
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> Union[pl.LazyFrame, float, int]:
+        """
+        Perform real computing on the given data.
+
+        Args:
+            data (pl.LazyFrame): The input data to perform the computation on.
+            select_final_factor (bool, optional): Whether to select the final factor. Defaults to False.
+
+        Returns:
+            Union[pl.LazyFrame, float, int]: The computed result, which can be a LazyFrame, float, or int.
+        """
+        self._batch_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data
+    
+    def set_base_columns(self, base_columns: List[str]) -> None:
+        """
+        Set the base columns for the feed.
+
+        Args:
+            base_columns (List[str]): The list of base columns to set.
+
+        Returns:
+            None
+        """
+        self._base_columns = base_columns
 
     def __str__(self):
         return type(self).__name__
@@ -137,10 +180,12 @@ class Expression(metaclass=ABCMeta):
 
     @property
     def is_featured(self): 
-        raise NotImplementedError("This function must be implemented in your newly defined expression")
+        raise NotImplementedError("This function should be implemented in your newly defined expression")
     
 
 class Feature(Expression):
+    """Represents a feature in the dataset."""
+
     def __init__(self, feature_name: str) -> None:
         self._feature_name = feature_name
 
@@ -157,12 +202,27 @@ class Feature(Expression):
     @property
     def is_featured(self): 
         return True
-
+        
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        self._batch_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data
 
 class Constant(Expression):
     '''
-        The is used for helping building simper expression tree.
+    A class representing a constant value in an expression tree.
+
+    Args:
+        value (float): The value of the constant.
+
+    Attributes:
+        _value (float): The value of the constant.
+        _feature_name (str): The name of the constant feature.
+
     '''
+
     def __init__(self, value: float) -> None:
         self._value = value
         self._feature_name = f'Constant({str(self._value)})'
@@ -174,7 +234,8 @@ class Constant(Expression):
             self._expr_update = True 
         return self._expr 
 
-    def batch_update(self, data: pl.LazyFrame) -> float:
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> float:
+        self._batch_update = True 
         return  self.expr  
 
     def __str__(self) -> str: 
@@ -186,6 +247,14 @@ class Constant(Expression):
 
 
 class Operator(Expression):
+    """
+    Base class for operators in the expression tree.
+
+    Subclasses of Operator should implement the following methods:
+    - n_args(): Returns the number of arguments the operator takes.
+    - category_type(): Returns the category type of the operator.
+
+    """
     @classmethod
     @abstractmethod
     def n_args(cls) -> int: ...
@@ -214,6 +283,20 @@ class UnaryOperator(Operator):
     def is_featured(self): 
         return self._hs.is_featured
 
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data)
+            self._batch_update = True 
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data
+
 
 class BinaryOperator(Operator):
     def __init__(
@@ -238,6 +321,21 @@ class BinaryOperator(Operator):
     @property
     def is_featured(self): 
         return self._lhs.is_featured or self._rhs.is_featured
+        
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._lhs.batch_update(data)
+            data = self._rhs.batch_update(data)
+            self._batch_update = True
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data 
 
 class TripleOperator(Operator):
     def __init__(
@@ -265,6 +363,22 @@ class TripleOperator(Operator):
     def is_featured(self): 
         return self._lhs.is_featured or self._mhs.is_featured or self._rhs.is_featured
 
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame: 
+        if not self._batch_update:
+            data = self._lhs.batch_update(data)
+            data = self._mhs.batch_update(data)
+            data = self._rhs.batch_update(data)
+            self._batch_update = True
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data 
+
 class RollingOperator(Operator):
     def __init__(
         self, 
@@ -284,11 +398,25 @@ class RollingOperator(Operator):
         return RollingOperator
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}({self._hs},{self._window})"
+        return f"{type(self).__name__}({self._hs},{self._window_size})"
 
     @property
     def is_featured(self):
         return self._hs.is_featured
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data)
+            self._batch_update = True 
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr])
+        else:
+            return data 
 
 class PairRollingOperator(Operator):
     def __init__(
@@ -316,6 +444,23 @@ class PairRollingOperator(Operator):
     def is_featured(self):
         return self._lhs.is_featured or self._rhs.is_featured
 
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._lhs.batch_update(data)
+            data = self._rhs.batch_update(data)
+            self._batch_update = True 
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr]) 
+        else:
+            return data 
+
+
+
 class CrossSectionalOperator(Operator):
     def __init__(
         self, 
@@ -338,28 +483,92 @@ class CrossSectionalOperator(Operator):
     def is_featured(self):
         return self._hs.is_featured
 
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame: 
+        if not self._batch_update:
+            data = self._hs.batch_update(data)
+            self._batch_update = True 
+        data = data.with_columns(
+            self.expr.alias(str(self)) 
+        )
+        self._expr = pl.col(str(self)) 
+        self._expr_update = True 
+        if select_final_factor:
+            return data.select(self._base_columns + [self.expr]) 
+        else:
+            return data 
 
-# # class Add(BinaryOperator):
-# #     @property
-# #     def expr(self) ->pl.Expr:
-# #         if not self._expr_update:
-# #             self._expr = self._lhs.expr + self._rhs.expr
-# #             self._expr_update = True 
-# #         return self._expr 
 
-# # class ExpressionBuilder:
-# #     stack: List[Expression]
-# #     def __init__(self, stack):
-# #         self.stack = stack
-# #     def batch_update(self,data):
-# #         for item in self.stack:
-# #             data = data.pipe(item.batch_update)
+class CallOrderError(Exception):
+    pass
+
+# class Prod(RollingOperator):
+#     @property
+#     def expr(self) -> Union[pl.Expr, float, int]:
+#         if not self._expr_update:
+#             raise CallOrderError("You must call batch_update to update the expression before calling expr")
+#         else:
+#             return self._expr    
+
+#     def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+#         if not self._batch_update:
+#             data = self._hs.batch_update(data) 
+#             self._batch_update = True 
+#         if "index" not in data.columns:
+#             data = data.with_columns(
+#                 pl.int_range(pl.len()).alias("index")
+#             )
+            
+#         result = data.rolling(
+#             "index", 
+#             period=f"{self._window_size}i",
+#             by = "symbol").agg(
+#                 self._hs.expr.product().alias(str(self))
+#             )
+#         result = data.join(result, on = ["index"], how = "left")
+#         self._expr = pl.col(str(self))
+#         self._expr_update = True 
+#         if select_final_factor:
+#             return result.select(self._base_columns + [self.expr])
+#         else:
+#             return result 
+
+# class Add(BinaryOperator):
+#     @property
+#     def expr(self) ->pl.Expr:
+#         if not self._expr_update:
+#             self._expr = self._lhs.expr + self._rhs.expr
+#             self._expr_update = True 
+#         return self._expr 
+
+
+# class ExpressionBuilder:
+#     stack: List[Expression]
+#     def __init__(self, stack):
+#         self.stack = stack
+#     def batch_update(self,data):
+#         for item in self.stack:
+#             data = data.pipe(item.batch_update)
 
 # if __name__ == "__main__":
-#     filename = "../../../example_data/PEPEUSDT_kline.parquet"
+#     import pandas as pd 
+#     filename = "../example_data/data.parquet"
 #     df = pl.read_parquet(filename)
+#     df = df.with_columns(
+#         [
+#             pl.col("date").alias("datetime"),
+#             pl.col("asset").alias("symbol")
+#         ]
+#     )
+#     df = df.sort(["symbol","datetime"])
+#     df = df.with_columns(
+#         pl.int_range(pl.len()).alias("index")
+#     )
+#     print(df.head())
 #     df = df.lazy()
 #     f1 = Feature("open")
+#     current_time = pd.Timestamp.now()
 #     #print(df.select(pl.col("open")))
-#     f = Add(Feature("close"),Feature("open"))
-#     print(f.batch_update(df).collect())
+#     f = Add(Prod(Prod(Feature("open"),3),3),Feature("close")) 
+#     #f = Add(Feature("open"),Feature("close"))
+#     print(f.batch_update(df,True).collect().columns)
+#     print(f"Time used: {pd.Timestamp.now() - current_time}")

@@ -5,7 +5,7 @@ except ImportError:
 import numpy as np
 import polars as pl 
 import warnings
-from plexpr_func import rank_pct, slope, rsqure, residual
+from plexpr_func import percentile_rank, rank_pct, slope, rsqure, residual
 from base import (
     Expression,
     Feature,
@@ -15,7 +15,8 @@ from base import (
     TripleOperator,
     RollingOperator,
     PairRollingOperator,
-    CrossSectionalOperator
+    CrossSectionalOperator,
+    CallOrderError
 )
 
 class Abs(UnaryOperator):
@@ -237,18 +238,38 @@ class Sum(RollingOperator):
             self._expr_update = True 
         return self._expr.over("symbol")
 
+
 class Prod(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = self._hs.expr.product()
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
 
-    def batch_update(self, data):
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
         if "index" not in data.columns:
-            data = data.with_columns(index=pl.arange(0, pl.count()).alias("index"))
-        data = data.groupby_rolling("index", period=self._window_size).agg(self._expr)
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                self._hs.expr.product().alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
+
 
 class Std(RollingOperator):
     @property
@@ -295,10 +316,33 @@ class Max(RollingOperator):
 class IdxMax(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(self.hs_.expr.arg_max())
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                (self._hs.expr.arg_max()+1).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
 
 
 class Min(RollingOperator):
@@ -313,10 +357,33 @@ class Min(RollingOperator):
 class IdxMin(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(self._hs.expr.arg_min())
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                (self._hs.expr.arg_min()+1).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
 
 class Quantile(RollingOperator):
     #quantile elements taken from the input feature
@@ -347,21 +414,95 @@ class Median(RollingOperator):
         return self._expr.over("symbol")
 
 class Mad(RollingOperator):
-    #mad elements taken from the input feature
+    """
+    Class representing the Mean Absolute Deviation (MAD) rolling operator.
+
+    Attributes:
+        _expr (Union[pl.Expr, float, int]): The expression used for calculating the MAD.
+        _expr_update (bool): Flag indicating whether the expression has been updated.
+        _batch_update (bool): Flag indicating whether batch update has been called.
+        _window_size (int): The size of the rolling window.
+
+    Methods:
+        expr() -> Union[pl.Expr, float, int]: Returns the expression used for calculating the MAD.
+        batch_update(data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+            Performs batch update on the data and returns the updated frame.
+
+    """
+
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
         if not self._expr_update:
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg((self._hs.expr - self._hs.expr.median()).abs().median())
-            self._expr_update = True 
-        return self._expr.over("symbol")
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                (
+                    (self._hs.expr - self._hs.expr.mean()).abs().mean()
+                ).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result
+
 
 class Rank(RollingOperator):
     """Rolling Rank (Percentile)
     """
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(self._hs.rank().last()/(pl.count()-pl.null_count())/(pl.count()-pl.null_count())*100) 
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                percentile_rank(self._hs.expr).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
+
+
+class Count(RollingOperator):
+    @property
+    def expr(self) -> Union[pl.Expr, float, int]:
+        if not self._expr_update:
+            self._expr = self._hs.expr.is_null().rolling_sum(window_size = self._window_size)
+            self._expr = self._window_size - self._expr 
             self._expr_update = True 
         return self._expr.over("symbol")
 
@@ -380,30 +521,102 @@ class Slope(RollingOperator):
     """
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(slope(pl.col("index"),self._hs.expr))
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                slope(pl.col("index"),self._hs.expr).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
+    
+
 
 class Rsquare(RollingOperator):
     """Rolling Rsquare
     """
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(rsqure(pl.col("index"),self._hs.expr))
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                rsqure(pl.col("index"),self._hs.expr).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
+
 
 class Resi(RollingOperator):
     """Rolling Regression Residuals
     """
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
-        if not self._expr_update: 
-            self._expr = pl.arange(0,pl.count()).alias("index").groupby_rolling("index",period=self._window_size).agg(residual(pl.col("index"),self._hs.expr))
-            self._expr_update = True 
-        return self._expr.over("symbol")
+        if not self._expr_update:
+            raise CallOrderError("You must call batch_update to update the expression before calling expr")
+        else:
+            return self._expr    
+
+    def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> pl.LazyFrame:
+        if not self._batch_update:
+            data = self._hs.batch_update(data) 
+            self._batch_update = True 
+        if "index" not in data.columns:
+            data = data.with_columns(
+                pl.int_range(pl.len()).alias("index")
+            )
+            
+        result = data.rolling(
+            "index", 
+            period=f"{self._window_size}i",
+            by = "symbol").agg(
+                residual(pl.col("index"),self._hs.expr).alias(str(self))
+            )
+        result = data.join(result, on = ["index"], how = "left")
+        self._expr = pl.col(str(self))
+        self._expr_update = True 
+        if select_final_factor:
+            return result.select(self._base_columns + [self.expr])
+        else:
+            return result 
 
 #Pair-Wise Rolling 
 class Corr(PairRollingOperator):
@@ -487,6 +700,7 @@ OpsList = [
     Median,
     Mad,
     Rank,
+    Count,
     Delta,
     Slope,
     Rsquare,

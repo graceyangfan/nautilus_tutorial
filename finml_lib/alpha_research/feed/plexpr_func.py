@@ -1,5 +1,23 @@
 import polars as pl 
 
+def percentile_rank(expr: pl.Expr) -> pl.Expr:
+    """
+    Calculate the percentile rank of a series.
+
+    Parameters
+    ----------
+    expr : pl.Expr
+        The series to calculate the percentile rank of.
+
+    Returns
+    -------
+    pl.Expr
+        The percentile rank of the series.
+    """
+
+    return expr.rank().last() / (expr.len() - expr.null_count()) / (expr.len() - expr.null_count()) * 100
+
+
 def rank_pct(expr: pl.Expr) -> pl.Expr:
     """
     Calculate the rank percent of a series.
