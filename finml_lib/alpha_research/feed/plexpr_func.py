@@ -15,7 +15,7 @@ def percentile_rank(expr: pl.Expr) -> pl.Expr:
         The percentile rank of the series.
     """
 
-    return expr.rank().last() / (expr.len() - expr.null_count()) / (expr.len() - expr.null_count()) * 100
+    return expr.rank().last() / (expr.len() - expr.null_count()) 
 
 
 def rank_pct(expr: pl.Expr) -> pl.Expr:
@@ -50,7 +50,7 @@ def slope(x:pl.Expr, y: pl.Expr) -> pl.Expr:
     pl.Expr
         The slope of the linear regression line.
     """
-    return (pl.corr(x, y) * pl.std(y)) / pl.std(x)
+    return (pl.corr(x, y) * y.std()) / x.std()
 
 def rsqure(x:pl.Expr, y: pl.Expr) -> pl.Expr:
     """
@@ -68,9 +68,9 @@ def rsqure(x:pl.Expr, y: pl.Expr) -> pl.Expr:
     pl.Expr
         The R^2 value of the linear regression line.
     """
-    return pl.pow(pl.corr(x, y), 2)
+    return pl.corr(x, y).pow(2)
 
-def residual(x:pl.Expr, y: pl.Expr) -> pl.Expr:
+def residual(x: pl.Expr, y: pl.Expr) -> pl.Expr:
     """
     Calculate the residuals of a linear regression line between x and y.
 
@@ -86,4 +86,6 @@ def residual(x:pl.Expr, y: pl.Expr) -> pl.Expr:
     pl.Expr
         The residuals of the linear regression line.
     """
-    return y - (pl.corr(x, y) * (y / x) * x)
+    slope = (pl.corr(x, y) * y.std()) / x.std()
+    intercept = y.mean() - slope * x.mean()
+    return (y - (slope * x + intercept)).last()

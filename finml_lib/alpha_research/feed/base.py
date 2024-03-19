@@ -236,7 +236,13 @@ class Constant(Expression):
 
     def batch_update(self, data: pl.LazyFrame, select_final_factor: bool = False) -> float:
         self._batch_update = True 
-        return  self.expr  
+        data = data.with_columns(
+            pl.lit(self._value).alias(str(self))
+        )
+        if  select_final_factor:
+            return self._value 
+        else:
+            return data 
 
     def __str__(self) -> str: 
         return f'Constant({str(self._value)})'

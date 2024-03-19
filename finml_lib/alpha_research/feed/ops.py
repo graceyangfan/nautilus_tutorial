@@ -501,7 +501,7 @@ class Count(RollingOperator):
     @property
     def expr(self) -> Union[pl.Expr, float, int]:
         if not self._expr_update:
-            self._expr = self._hs.expr.is_null().rolling_sum(window_size = self._window_size)
+            self._expr = self._hs.expr.is_null().cast(pl.UInt32).rolling_sum(window_size = self._window_size)
             self._expr = self._window_size - self._expr 
             self._expr_update = True 
         return self._expr.over("symbol")

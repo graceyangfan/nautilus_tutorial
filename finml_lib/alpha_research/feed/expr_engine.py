@@ -20,7 +20,6 @@ class ExprEngine:
     @staticmethod
     def get_expression(feature):
         feature = ExprEngine.parse_field(feature)
-        print(feature)
         try:
             expr = eval(feature)
         except:
