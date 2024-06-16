@@ -14,35 +14,36 @@
 #  limitations under the License.
 # -------------------------------------------------------------------------------------------------
 
-import gc 
-import os 
-import numpy as np 
-import pandas as pd 
+
+import os
+import ray  
 import argparse
-from decimal import Decimal
-from tqdm import tqdm 
-from joblib import Parallel,delayed 
-from nautilus_trader.backtest.node import BacktestNode
-from nautilus_trader.backtest.engine import BacktestEngine
-from nautilus_trader.backtest.engine import BacktestEngineConfig
+import pandas as pd 
+from ray import tune
 from nautilus_trader.config import BacktestDataConfig
-from nautilus_trader.model.identifiers import Venue
-from nautilus_trader.model.enums import AccountType
-from nautilus_trader.model.enums import OmsType
-from nautilus_trader.model.objects import Money
-from nautilus_trader.model.currencies import USDT
-from nautilus_trader.config import LoggingConfig
+from nautilus_trader.config import ImportableStrategyConfig
+from nautilus_trader.backtest.config import BacktestVenueConfig
+from nautilus_trader.backtest.node import BacktestNode
+from nautilus_trader.backtest.config import BacktestRunConfig
+from nautilus_trader.backtest.engine import BacktestEngineConfig
 from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
+from nautilus_trader.model.identifiers import InstrumentId
 from hyperopt import RayBacktestNode 
 
-def node_setup(params):
+
+def node_setup(
+    params,
+    catalog_path,
+    start_time,
+    end_time
+):
     data_configs = [
         BacktestDataConfig(
-            catalog_path="../catalog",
+            catalog_path=str(catalog_path),
             data_cls="nautilus_trader.model.data:Bar",
-            instrument_id = params["instrument_id"],
-            start_time = params["start_time"],
-            end_time = params["end_time"],
+            instrument_id = InstrumentId.from_str(params["instrument_id"]),
+            start_time = start_time,
+            end_time = end_time,
         )
     ]
     venues_configs = [
@@ -69,10 +70,10 @@ def node_setup(params):
                 buffer_pct = 0.001,
                 auto_reduce_start_pct = 0.06,
                 min_notional = 6,
-                check_timestamp_interval = pd.Timedelta(minutes=1),
-                supertrend_period = 20.0,
+                check_timestamp_min = 1,
+                supertrend_period = 20,
                 supertrend_mul = 4.,
-                hour_supertrend_period = 30.,
+                hour_supertrend_period = 30,
                 hour_supertrend_mul = 3.,
                 atr_period = 8,
                 mfi_period = 8,
@@ -98,10 +99,11 @@ def node_setup(params):
     return node 
 
 
-if __name__ == "__mian__":
+if __name__ == "__main__":
 
     num_workers = int(os.cpu_count ()//2)
-    catalog = ParquetDataCatalog(path="../catalog")
+    catalog_path = "/workspaces/codespaces-blank/nautilus_trader-develop/examples/catalog"
+    catalog = ParquetDataCatalog(path=catalog_path)
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', default='WLDUSDT')
     parser.add_argument("--venue",default='BINANCE') 
@@ -113,20 +115,17 @@ if __name__ == "__mian__":
     bar_type =instrument_id + '-'+str(args.minute1) +"-MINUTE-LAST-EXTERNAL"
     high_bar_type = instrument_id + '-'+str(args.minute2) +"-MINUTE-LAST-EXTERNAL"
     hour_bar_type = instrument_id + "-1-HOUR-LAST-EXTERNAL"
-   
     params = {
         "instrument_id":instrument_id,
         "bar_type":bar_type,
         "high_bar_type":high_bar_type,
         "hour_bar_type":hour_bar_type,
-        "start_time": "2024-1-1",
-        "end_time": "2024-3-1",
         "trade_usd": 100,
         "strength": 1.0,
         "buffer_pct":0.001,
         "auto_reduce_start_pct": 0.06,
         "min_notional": 6,
-        "check_timestamp_interval":pd.Timedelta(minutes=1),
+        "check_timestamp_min":1,
         "supertrend_period":tune.randint(10,100),
         "supertrend_mul":tune.uniform(1.0,9.),
         "hour_supertrend_period":tune.randint(10,100),
@@ -140,10 +139,25 @@ if __name__ == "__mian__":
         "reissue_threshold":0.01,
     }
     
-    best_params = node.ray_search(
-        params=params,
-        minimum_positions=30,
-        max_evals=100
-    )
-
-    print("Best parameters found:", best_params)
+    node = node_setup(
+        params,
+        catalog_path,
+        "2024-1-1",
+        "2024-1-10",
+    ) 
+    ray.init()
+    try:
+        results = node.ray_search(
+            params=params,
+            minimum_positions=10,
+            num_samples=10
+        )
+        print("Best parameters found:", results.get_best_config("loss", "min"))
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        # Optionally, print more detailed debug information
+        raise  # Reraise the exception to see the traceback
+    finally:
+        ray.shutdown()
+   
+ 

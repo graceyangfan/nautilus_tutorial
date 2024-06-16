@@ -1,13 +1,21 @@
+import sys 
 import ray
-from ray import tune
+from ray import train, tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 from decimal import Decimal
-from nautilus_trader.common.component LiveClock
+from typing import Dict,Optional,Any 
+from nautilus_trader.common.enums import LogLevel
+from nautilus_trader.common.component import Logger
+from nautilus_trader.common.component import LiveClock
+from nautilus_trader.config import StrategyConfig
+from nautilus_trader.config import ImportableStrategyConfig
 from nautilus_trader.backtest.node import BacktestNode
 from nautilus_trader.backtest.config import BacktestRunConfig
+from nautilus_trader.backtest.engine import BacktestEngineConfig
+from nautilus_trader.config import LoggingConfig
 
-class RayBacktestNode(HyperoptBacktestNode):
+class RayBacktestNode(BacktestNode):
     def __init__(self, base_config: BacktestRunConfig):
         super().__init__(configs=[base_config])
 
@@ -39,26 +47,27 @@ class RayBacktestNode(HyperoptBacktestNode):
         self,
         params: Dict[str, Any],
         minimum_positions: int = 50,
-        max_evals: int = 50,
+        num_samples: int = 50,
         cpu_nums: int = 4,
         gpu_nums: int = 0
     ):
         def objective(config):
-            try:
                 strategies = [
                     ImportableStrategyConfig(
                         strategy_path=self.strategy_path,
                         config_path=self.config_path,
-                        config=self.strategy_config(
-                            **config,
-                        ),
+                        config=config,
                     ),
                 ]
-
-                local_config = self.config
-                local_config = local_config.replace(strategies=strategies)
-                local_config.check()
-
+                local_config = BacktestRunConfig(
+                    engine=BacktestEngineConfig(
+                        strategies=strategies,
+                        logging=LoggingConfig(log_level="OFF"),
+                    ),
+                    venues=self.config.venues,
+                    data=self.config.data 
+                )
+                print(self.config.data)
                 result = self._run(
                     run_config_id=local_config.id,
                     engine_config=local_config.engine,
@@ -67,19 +76,15 @@ class RayBacktestNode(HyperoptBacktestNode):
                     batch_size_bytes=local_config.batch_size_bytes,
                 )
 
-                base_currency = self.config.venues[0].base_currency
-                profit_factor = result.stats_returns["Profit Factor"]
+                sharp_ratio = result.stats_returns['Sharpe Ratio (252 days)']
 
-                if (
-                    profit_factor <= 0
-                    or result.total_positions < minimum_positions
-                ):
-                    tune.report(loss=float("inf"))
-                else:
-                    tune.report(loss=(1 / profit_factor))
-
-            except Exception as e:
-                tune.report(loss=float("inf"))
+                # if (
+                #     sharp_ratio <= 0
+                #     or result.total_positions < minimum_positions
+                # ):
+                #     train.report({"loss":float("inf")})
+                # else:
+                train.report({"loss": -sharp_ratio})
 
         search_space = params
 
@@ -87,7 +92,6 @@ class RayBacktestNode(HyperoptBacktestNode):
         scheduler = ASHAScheduler(
             metric="loss",
             mode="min",
-            max_t=100,
             grace_period=1,
             reduction_factor=2
         )
@@ -100,31 +104,10 @@ class RayBacktestNode(HyperoptBacktestNode):
         analysis = tune.run(
             objective,
             config=search_space,
-            num_samples=max_evals,
+            num_samples=num_samples,
             scheduler=scheduler,
             progress_reporter=reporter,
             resources_per_trial={"cpu": cpu_nums, "gpu": gpu_nums}
         )
 
-        return analysis.best_config
-
-# Example usage:
-base_config = BacktestRunConfig(...)  # Initialize with appropriate values
-node = RayBacktestNode(base_config)
-
-params = {
-    'param1': tune.uniform(0, 1),
-    'param2': tune.uniform(0, 10),
-    'param3': tune.choice([0, 1, 2, 3, 4])
-}
-
-best_params = node.ray_search(
-    params=params,
-    minimum_positions=50,
-    max_evals=100
-)
-
-print("Best parameters found:", best_params)
-
-
-
+        return analysis
