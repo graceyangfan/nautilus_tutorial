@@ -17,7 +17,7 @@ pub struct KalmanFilter {
 #[pymethods]
 impl KalmanFilter {
     #[new]
-    #[args(q = "0.001", r = "10.0", p = "1000000.0")]
+    #[args(q = "0.0001", r = "0.0001", p = "1000000.0")]
     pub fn new(q:f64, r:f64, p:f64) -> Self {
         Self {
             state_mean: SMatrix::<f64, 2, 1>::zeros(),
