@@ -255,7 +255,7 @@ class ASMarketMaker(Strategy):
             self._book.best_ask_price(),
             self._book.best_bid_price(),
             int(self._book.ts_last / 10**6)
-            )
+        )
 
         ## make sure the model hase been initialized
         if len(self.wap) < self.sigma_tick_period or (not self.as_model.initialized())  or len(self.twist.xds) < 1:

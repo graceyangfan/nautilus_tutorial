@@ -2,40 +2,27 @@ use pyo3::prelude::*;
 use std::collections::VecDeque;
 
 #[derive(Debug,Clone)]
-pub struct ZSBlock
-{
-    pub start: OrderBlock,
-    pub end: OrderBlock,
-    pub gg: f64,
-    pub dd: f64,
-    pub zg: f64,
-    pub zd: f64
-}
-
-
-#[derive(Debug,Clone)]
 pub struct OrderBlock
 {
     pub is_bull: bool,
-    pub mitigated_times: usize,
     pub top: f64,
     pub bottom: f64,
     pub value: f64,
     pub ts_event: u64,
 }
 
-pub fn check_mitigated(block: &OrderBlock, last_target: f64, current_target: f64) -> bool 
+pub fn remove_mitigated(block: &OrderBlock, target: f64) -> bool 
 {
     if block.is_bull 
     {
-        if current_target < block.bottom && block.bottom < last_target
+        if target < block.bottom
         {
             return true;
         }
     }
     else
     {
-        if current_target > block.top && block.top > last_target
+        if target > block.top
         {
             return true;
         }
@@ -43,59 +30,38 @@ pub fn check_mitigated(block: &OrderBlock, last_target: f64, current_target: f64
     false
 }
 
-
-
 #[pyclass]
 #[derive(Debug)]
 pub struct OrderBlockDetector {
     high_array:VecDeque<f64>,
     low_array:VecDeque<f64>,
     close_array: VecDeque<f64>,
-    ts_event_array: VecDeque<u64>,
-    blocks: VecDeque<OrderBlock>,
-    big_blocks: VecDeque<OrderBlock>,
-    zsblocks: VecDeque<ZSBlock>,
-    zs_threshold: f64,
-    small_block_updated: bool,
-    big_block_updated: bool,
-    small_block_values: VecDeque<f64>,
+    volume_array: VecDeque<f64>,
+    bull_blocks: VecDeque<OrderBlock>,
+    bear_blocks: VecDeque<OrderBlock>,
     period: usize,
-    order: usize,
-    reduce_order: usize,
     block_nums: usize,
-    zs_nums: usize,
+    delta_pct: f64,
+    os: usize,
     initialized: bool,
 }
 
 #[pymethods]
 impl OrderBlockDetector {
     #[new]
-    #[args(block_nums = "8",reduce_order = "3",zs_num = 3)] 
-    pub fn new(
-        period: usize, 
-        order: usize, 
-        reduce_order: usize, 
-        block_nums: usize,
-        zs_nums: usize,
-        zs_threshold: f64,
-    ) -> Self {
+    #[args(block_nums = "1")]
+    pub fn new(period: usize, delta_pct: f64, block_nums: usize) -> Self {
         Self {
                 high_array: VecDeque::with_capacity(period),
                 low_array: VecDeque::with_capacity(period),
                 close_array: VecDeque::with_capacity(period),
-                ts_event_array: VecDeque::with_capacity(period),
-                blocks: VecDeque::with_capacity(block_nums),
-                big_blocks: VecDeque::with_capacity(block_nums),
-                zsblocks: VecDeque::with_capacity(block_nums),
-                zs_threshold: zs_threshold,
-                small_block_updated: false,
-                big_block_updated: false,
-                small_block_values: VecDeque::with_capacity(block_nums),
+                volume_array: VecDeque::with_capacity(2*period+1),
+                bull_blocks: VecDeque::with_capacity(block_nums),
+                bear_blocks: VecDeque::with_capacity(block_nums),
                 period: period,
-                order: order,
-                reduce_order: reduce_order,
                 block_nums: block_nums,
-                zs_nums: zs_nums,
+                delta_pct: delta_pct,
+                os: 0,
                 initialized: false,
         }
     }
@@ -105,184 +71,89 @@ impl OrderBlockDetector {
         high: f64,
         low: f64,
         close: f64,
+        volume: f64,
         ts_event: u64,
     )
     {   
-        self.small_block_updated = false;
-        self.big_block_updated = false;
-        self.high_array.push_back(high);
-        self.low_array.push_back(low);
-        self.close_array.push_back(close);
-        self.ts_event_array.push_back(ts_event);
-        if self.zsblocks.len() >= self.zs_nums
+        let mut h = high;
+        let mut l = low;
+        let mut hl = (h + l)/2.0;
+        if self.volume_array.len() >= 2*self.period + 1
         {
             self.initialized = true;
+            h = self.high_array[0];
+            l = self.low_array[0];
+            hl = (h + l)/2.0;
         }
         self.pop_front();
 
-        if self.high_array.len() >= 2*self.order + 1
+        self.high_array.push_back(high);
+        self.low_array.push_back(low);
+        self.close_array.push_back(close);
+        self.volume_array.push_back(volume);
+
+
+        let upper = self.high_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
+        let lower = self.low_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
+        let target_bull = self.close_array.iter().min_by(|a, b| a.total_cmp(b)).cloned().unwrap();
+        let target_bear = self.close_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
+
+        if h > upper
         {
-            let high_values = self.high_array.range(self.high_array.len()-2*self.order-1..self.high_array.len()).copied().collect::<Vec<_>>();
-            let low_values = self.low_array.range(self.low_array.len()-2*self.order-1..self.low_array.len()).copied().collect::<Vec<_>>();
-            let max_high_idx =  high_values.iter().enumerate().max_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();
-            let min_low_idx = low_values.iter().enumerate().min_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();            
-            let h = high_values[self.order];
-            let l = low_values[self.order];
-            if max_high_idx  == self.order 
+            self.os = 0;
+        }
+        else
+        {
+            if l < lower
             {
-                self.blocks.push_back(
-                    OrderBlock{
-                        is_bull: false,
-                        mitigated_times: 0,
-                        top: h,
-                        bottom: l,
-                        value: h,
-                        ts_event: self.ts_event_array[self.ts_event_array.len()-1-self.order]
-                    }
-                );
-                self.small_block_updated = true;
-                self.small_block_values.push_back(h);
+                self.os = 1;
             }
-            
-            if min_low_idx == self.order 
-            {
-                self.blocks.push_back(
+        }
+        
+        let max_volume = self.volume_array.iter().max_by(|a, b| a.total_cmp(b)).cloned().unwrap();
+        let phv = self.volume_array[(self.volume_array.len()-1)/2] / max_volume > 1.0 - self.delta_pct;
+
+        if phv && self.os == 1 && self.initialized
+        {
+            self.bull_blocks.push_back(
                     OrderBlock{
                         is_bull: true,
-                        mitigated_times: 0,
-                        top: h,
+                        top: hl,
                         bottom: l,
                         value: l,
-                        ts_event: self.ts_event_array[self.ts_event_array.len()-1-self.order]
+                        ts_event: ts_event,
                     }
-                );
-                self.small_block_updated = true;
-                self.small_block_values.push_back(l);
-            }
+            )
         }
 
-        // mitigated block 
-        for i in (0..self.blocks.len()).rev()
+        if phv && self.os == 0 && self.initialized
         {
-            if self.blocks[i].is_bull 
-            {
-                if  self.close_array.len()>=2 && check_mitigated(&self.blocks[i], self.close_array[self.close_array.len()-2], close)
-                {
-                    self.blocks[i].mitigated_times += 1;
-                }
-            }
-            else
-            {
-                if  self.close_array.len()>=2 && check_mitigated(&self.blocks[i], self.close_array[self.close_array.len()-2], close)
-                {
-                    self.blocks[i].mitigated_times += 1;
-                }
-            }
-        }
-        // small blocks into bigblock 
-        if self.small_block_updated && self.small_block_values.len() >=2* self.reduce_order + 1
-        {
-            let block_values = self.small_block_values.range(self.small_block_values.len()-2*self.reduce_order-1..self.small_block_values.len()).copied().collect::<Vec<_>>();
-            let max_idx =  block_values.iter().enumerate().max_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();
-            let min_idx = block_values.iter().enumerate().min_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(index, _)| index).unwrap();  
-            if max_idx == self.reduce_order  
-            {
-                let block = &self.blocks[max_idx];
-                self.big_blocks.push_back(
+            self.bear_blocks.push_back(
                     OrderBlock{
                         is_bull: false,
-                        mitigated_times: block.mitigated_times,
-                        top: block.top,
-                        bottom: block.bottom,
-                        value: block.value,
-                        ts_event: block.ts_event
+                        top: h,
+                        bottom: hl,
+                        value: h,
+                        ts_event: ts_event,
                     }
-                );
-                self.big_block_updated = true;
-            }
-            if  min_idx == self.reduce_order  
-            {   
-                let block = &self.blocks[min_idx];
-                self.big_blocks.push_back(
-                    OrderBlock{
-                        is_bull: true,
-                        mitigated_times: block.mitigated_times,
-                        top: block.top,
-                        bottom: block.bottom,
-                        value: block.value,
-                        ts_event: block.ts_event
-                    }
-                );
-                self.big_block_updated = true;
+            )
+        }
+        
+        // remove mitigated block 
+        for i in (0..self.bull_blocks.len()).rev()
+        {
+            if remove_mitigated(&self.bull_blocks[i], target_bull)
+            {
+                self.bull_blocks.remove(i);
             }
         }
-        //update ZS structure 
-        if self.big_block_updated && self.big_blocks.len() >=4
+       
+        for i in (0..self.bear_blocks.len()).rev()
         {
-            let cur_block = &self.big_blocks[self.big_blocks.len()-1];
-            // no ZS blocks or ZSblock end is not the last bigblock 
-            if self.zsblocks.len() == 0 || self.zsblocks[self.zsblocks.len()-1].end.ts_event != self.big_blocks[self.big_blocks.len()-2].ts_event 
+            if remove_mitigated(&self.bear_blocks[i], target_bear)
             {
-                //create a new zs 
-                let back_block_1 = &self.big_blocks[self.big_blocks.len()-2];
-                let back_block_2 = &self.big_blocks[self.big_blocks.len()-3];
-                let back_block_3 = &self.big_blocks[self.big_blocks.len()-4];
-
-                let max_one = f64::max(cur_block.value, back_block_1.value);
-                let min_one = f64::min(cur_block.value, back_block_1.value);
-                let max_two = f64::max(back_block_2.value, back_block_3.value);
-                let min_two = f64::min(back_block_2.value, back_block_3.value);
-                let zg = f64::min(max_two, max_one);
-                let zd = f64::max(min_two, min_one);
-                let gg = f64::max(max_two, max_one);
-                let dd = f64::min(min_two, min_one);
-                if zg > zd && (zg-zd)/(gg - dd) < self.zs_threshold 
-                {
-                    self.zsblocks.push_back(
-                        ZSBlock{
-                            start: back_block_3.clone(),
-                            end: cur_block.clone(),
-                            gg: gg,
-                            dd: dd,
-                            zg: zg,
-                            zd: zd,
-                        }
-                    )
-                };
-            }    
-            else 
-            {
-                let mut cur_zs = self.zsblocks.pop_back().unwrap();
-                // check the old ZS should continue 
-                if cur_block.is_bull 
-                {
-                    if cur_block.top > cur_zs.gg && (cur_zs.zg-cur_zs.zd)/(cur_block.top - cur_zs.dd) < self.zs_threshold
-                    {
-                        cur_zs.end = cur_block.clone();
-                        cur_zs.gg = cur_block.top;
-                    }
-                    else if cur_block.top < cur_zs.gg && cur_block.top > cur_zs.zg 
-                    {
-                        cur_zs.end = cur_block.clone();
-                        cur_zs.zg = cur_block.top;
-                    }
-                }
-                else 
-                {
-                    if cur_block.bottom < cur_zs.dd && (cur_zs.zg-cur_zs.zd)/(cur_zs.gg - cur_block.bottom) < self.zs_threshold
-                    {
-                        cur_zs.end = cur_block.clone();
-                        cur_zs.dd = cur_block.bottom;
-                    }
-                    else if cur_block.bottom > cur_zs.dd && cur_block.bottom < cur_zs.zd 
-                    {
-                        cur_zs.end = cur_block.clone();
-                        cur_zs.zd = cur_block.bottom;
-                    }
-                }
-                self.zsblocks.push_back(cur_zs);
+                self.bear_blocks.remove(i);
             }
-                    
         }
     }
 
@@ -293,56 +164,50 @@ impl OrderBlockDetector {
             self.high_array.pop_front();
             self.low_array.pop_front();
             self.close_array.pop_front();
-            self.ts_event_array.pop_front();
         }
-        if self.blocks.len() >= self.block_nums + 1
+        if self.volume_array.len() >= 2 * self.period + 2 
         {
-            self.blocks.pop_front();
-            self.small_block_values.pop_front();
-        } 
-        if self.big_blocks.len() >= self.block_nums + 1
-        {
-            self.big_blocks.pop_front();
+            self.volume_array.pop_front();
         }
-        if self.zsblocks.len() >= self.zs_nums + 1
+        if self.bull_blocks.len() >= self.block_nums + 1
         {
-            self.zsblocks.pop_front();
+            self.bull_blocks.pop_front();
+        }
+        if self.bear_blocks.len() >= self.block_nums + 1 
+        {
+            self.bear_blocks.pop_front();
         }
     }
 
-
-    pub fn zs_nums(&self) -> usize
-    {
-        self.zsblocks.len()
+    pub fn bull_blocks_num(&self) -> usize {
+        self.bull_blocks.len()
     }
 
-    pub fn get_zs(&self, idx: usize) -> (u64,u64,f64, f64, f64, f64, f64, f64)
+    pub fn bear_blocks_num(&self) -> usize {
+        self.bear_blocks.len()
+    }
+
+    pub fn get_bull_block(&self, idx: usize) -> (f64, f64, f64, u64)
     {
-        if idx > self.zsblocks.len() - 1 
+        if idx > self.bull_blocks_num() - 1 
         {
-            return (0, 0 ,0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            return (0.0, 0.0, 0.0, 0);
         }
-        let zs = &self.zsblocks[self.zsblocks.len()-1-idx];
-        (zs.start.ts_event, zs.end.ts_event,zs.start.value, zs.end.value, zs.gg, zs.dd, zs.zg, zs.zd)
+        let block = &self.bull_blocks[self.bull_blocks.len()-1-idx];
+        (block.top, block.bottom, block.value, block.ts_event)
     }
 
-    pub fn big_block_nums(&self) -> usize
+    pub fn get_bear_block(&self, idx: usize) -> (f64, f64, f64, u64)
     {
-        self.big_blocks.len()
+        if idx > self.bear_blocks_num() - 1 
+        {
+            return (0.0, 0.0, 0.0, 0);
+        }
+        let block = &self.bear_blocks[self.bear_blocks.len()-1-idx];
+        (block.top, block.bottom, block.value, block.ts_event)
     }
 
     
-    pub fn get_big_block(&self, idx: usize) -> (u64, bool,usize,f64,f64,f64)
-    {
-        if idx > self.big_blocks.len() - 1 
-        {
-            return (0, false, 0, 0.0, 0.0, 0.0);
-        }
-        let block = &self.big_blocks[self.big_blocks.len()-1-idx];
-        (block.ts_event, block.is_bull, block.mitigated_times, block.top, block.bottom, block.value)
-    }
-
-   
     pub fn reset(&mut self) {
         self.initialized = false;
     }
@@ -350,5 +215,48 @@ impl OrderBlockDetector {
     pub fn initialized(&self) -> bool {
         self.initialized
     }
+
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+
+    #[test]
+    fn test_orderblock_detect()
+    {
+        // create an instance of OrderBlockDetector with period = 5, delta_pct = 0.01 and block_nums = 1
+        let mut detecter =  OrderBlockDetector::new(5, 0.01, 1);
+        // use some sample data for high, low, close, volume and timestamp
+        let high = vec![10000.0, 10100.0, 10200.0, 10300.0, 10400.0, 10350.0];
+        let low = vec![9900.0, 10000.0, 10100.0, 10200.0, 10300.0, 10250.0];
+        let close = vec![10000.0, 10100.0, 10200.0, 10300.0, 10400.0, 10300.0];
+        let volume = vec![1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0];
+        let ts_event = vec![1u64, 2u64, 3u64 ,4u64 ,5u64 ,6u64];
+    
+        // loop through the data and update the detecter
+        for i in 0..high.len() {
+            detecter.update_raw(high[i], low[i], close[i], volume[i], ts_event[i]);
+        }
+    
+        // check the number of bull blocks
+        assert_eq!(detecter.bull_blocks_num(), 1);
+        // check the number of bear blocks
+        assert_eq!(detecter.bear_blocks_num(), 1);
+        // check the details of the bull block
+        let (top_bull, bottom_bull, value_bull ,ts_event_bull) = detecter.get_bull_block(0);
+        assert_abs_diff_eq!(top_bull ,10150.0);
+        assert_abs_diff_eq!(bottom_bull ,10050.0);
+        assert_abs_diff_eq!(value_bull ,10050.0);
+        assert_eq!(ts_event_bull ,2u64);
+        // check the details of the bear block
+        let (top_bear ,bottom_bear ,value_bear ,ts_event_bear) = detecter.get_bear_block(0);
+        assert_abs_diff_eq!(top_bear ,10400.0);
+        assert_abs_diff_eq!(bottom_bear ,10325.0);
+        assert_abs_diff_eq!(value_bear ,10400.0);
+        assert_eq!(ts_event_bear ,5u64);
+    
+    }
+}

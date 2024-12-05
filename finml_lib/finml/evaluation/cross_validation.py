@@ -4,7 +4,7 @@ from itertools import combinations, chain
 
 def _get_purged_train_indices(event_times, test_times):
     event_times = event_times.select(
-        [pl.all(), pl.arange(0, pl.count()).alias("count_index")]
+        [pl.all(), pl.arange(0, pl.len()).alias("count_index")]
     )
     train_times = event_times.clone()
     overlap_df = pl.DataFrame([])
