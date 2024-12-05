@@ -1,65 +1,91 @@
-import lightgbm as lgb
-import numpy as np
 import os
+import numpy as np
+import lightgbm as lgb
+from types import SimpleNamespace
+from typing import List, Union
 
-def save_model(
-    models,
-    bar_type,
-    base_dir = "models"
-):
+def define_args(**kwargs):
     """
-    保存LightGBM模型
+    Define the arguments for the training process.
 
     Args:
-        models: 模型列表
-        bar_type: 数据类型标识
-        base_dir: 保存目录
-    """
-    for i, model in enumerate(models):
-        file_path = os.path.join(base_dir, f"{bar_type}_{i}.txt")
-        model.save_model(file_path)
-
-def load_model(
-    bar_type,
-    n_split = 5,
-    base_dir = "models",
-    lgb_type = "classifier"
-):
-    """
-    加载LightGBM模型
-
-    Args:
-        bar_type: 数据类型标识
-        n_split: 模型数量
-        base_dir: 模型目录
-        lgb_type: 模型类型("classifier"或"regressor")
+        **kwargs: Additional keyword arguments for customizing the default parameters.
 
     Returns:
-        加载的模型列表
+        SimpleNamespace: A namespace containing model configuration parameters.
+    """
+    args = SimpleNamespace(
+        # Cross-validation settings
+        n_splits=3,                # Number of splits for purged cross-validation
+        embargo_pct=0.01,           # Percentage of embargo for purged cross-validation
+        n_trials = 10,
+        time_budget_minutes = 10,
+        num_boost_round = 5000,
+        early_stopping_rounds = 100,
+        cpus_per_trial = 1,
+        gpu_per_trail = 0,
+        verbose_eval=100
+    )
+
+    # Update default arguments with user-defined values
+    args.__dict__.update(kwargs)
+    return args
+
+
+def save_lightgbm_models(
+    models: List[lgb.Booster],
+    data_type: str,
+    directory: str = "models"
+) -> None:
+    """
+    Save LightGBM models to the specified directory.
+
+    Args:
+        models: List of LightGBM models to save.
+        data_type: Identifier for the data type.
+        directory: Directory to save the models.
+    """
+    for index, model in enumerate(models):
+        file_path = os.path.join(directory, f"{data_type}_{index}.txt")
+        model.save_model(file_path)
+
+def load_lightgbm_models(
+    data_type: str,
+    num_models: int = 5,
+    directory: str = "models",
+) -> List[lgb.Booster]:
+    """
+    Load LightGBM models from the specified directory.
+
+    Args:
+        data_type: Identifier for the data type.
+        num_models: Number of models to load.
+        directory: Directory containing the models.
+
+    Returns:
+        List of loaded LightGBM models.
     """
     models = []
-    for i in range(n_split):
-        file_path = os.path.join(base_dir, f"{bar_type}_{i}.txt")
+    for index in range(num_models):
+        file_path = os.path.join(directory, f"{data_type}_{index}.txt")
         model = lgb.Booster(model_file=file_path)
         models.append(model)
     return models
 
-def predict_prob(
-    models,
-    feature
-):
+def predict_average_probability(
+    models: List[lgb.Booster],
+    features: np.ndarray
+) -> np.ndarray:
     """
-    集成预测概率
+    Predict average probability using ensemble of LightGBM models.
 
     Args:
-        models: 模型列表
-        feature: 输入特征
+        models: List of LightGBM models.
+        features: Input features.
 
     Returns:
-        平均预测概率
+        Average predicted probability.
     """
-    feature = feature.reshape((1, -1))
-    results = []
-    for model in models:
-        results.append(model.predict(feature))
-    return np.mean(results, axis=0) 
+    features = features.reshape((1, -1))
+    predictions = [model.predict(features) for model in models]
+    return np.mean(predictions, axis=0)

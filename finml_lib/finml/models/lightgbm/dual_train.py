@@ -11,11 +11,11 @@ def dual_label_one(
     test_label_in: pd.DataFrame,
     initial_model: lgb.Booster,
     params: dict,
-    dual_numbers: int,
+    dual_iterations: int,
+    dual_ratio: float,
     num_boost_round: int,
     early_stopping_rounds: int = 100,
     verbose_eval: int = 100,
-    dual_ratio: float = 0.5  # Split ratio for dual labels
 ) -> Tuple[List[lgb.Booster], float]:
     """
     Perform dual label training for boosting models with iterative label updates and majority voting.
@@ -27,11 +27,11 @@ def dual_label_one(
         test_label_in: Test/validation labels (DataFrame, should contain a "label" column).
         initial_model: Initial trained LightGBM Booster model.
         params: A dictionary of LightGBM parameters.
-        dual_numbers: Number of iterations for dual label updates.
+        dual_iterations: Number of iterations for dual label updates.
+        dual_ratio: Ratio for splitting dual labels.
         num_boost_round: Number of boosting rounds for training.
         early_stopping_rounds: Number of early stopping rounds (default: 100).
         verbose_eval: Interval to log evaluation metrics (default: 100).
-        dual_ratio: Ratio for splitting dual labels (default: 0.5).
 
     Returns:
         Tuple containing:
@@ -43,7 +43,7 @@ def dual_label_one(
     train_label_new = train_label_in.copy()
     models = []
 
-    for iteration in range(dual_numbers):  # Perform dual training for 'dual_numbers' iterations
+    for iteration in range(dual_iterations):  # Perform dual training for 'dual_iterations' iterations
         # Predict probabilities for the current training data
         train_label_new['proba'] = initial_model.predict(train_data_new)
 

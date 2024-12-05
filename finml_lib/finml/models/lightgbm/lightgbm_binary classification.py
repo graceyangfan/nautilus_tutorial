@@ -16,12 +16,14 @@ def lgb_hyperopt_with_ray(
     y_train: pd.Series,
     X_test: pd.DataFrame,
     y_test: pd.Series,
-    dual_numbers: int = 0,
+    dual_iterations: int = 0,
+    dual_ratio: float = 0.5, 
     n_trials: int = 50,
     time_budget_minutes: int = 10,
     num_boost_round: int = 5000,
     early_stopping_rounds: int = 100,
     cpus_per_trial: int = 1,
+    gpus_per_trial: int = 0, 
     verbose_eval: int = 100,
 ):
     """
@@ -30,6 +32,7 @@ def lgb_hyperopt_with_ray(
     Returns:
         best_params: Best hyperparameters found during optimization.
         best_model: Best LightGBM model trained with the best parameters.
+        best_auc: Best AUC score obtained during optimization. 
     """
 
     def objective_ray(config):
@@ -73,7 +76,7 @@ def lgb_hyperopt_with_ray(
             callbacks=callbacks
         )
 
-        if dual_numbers > 0:
+        if dual_iterations > 0:
             _, auc = dual_label_one(
                 train_data_in = X_train,
                 train_label_in = y_train,
@@ -81,10 +84,11 @@ def lgb_hyperopt_with_ray(
                 test_label_in = y_test,
                 initial_model = model,
                 params = params,
-                dual_numbers = dual_numbers,
+                dual_iterations = dual_iterations,
+                dual_ratio = dual_ratio,
                 num_boost_round = num_boost_round,
                 early_stopping_rounds = early_stopping_rounds,
-                verbose_eval = verbose_eval
+                verbose_eval = verbose_eval,
             )
             return {"auc": auc} 
         else:
@@ -122,7 +126,7 @@ def lgb_hyperopt_with_ray(
         config=search_space,
         search_alg=optuna_search,
         num_samples=n_trials,
-        resources_per_trial={"cpu": cpus_per_trial,"gpu":0},
+        resources_per_trial={"cpu": cpus_per_trial,"gpu": gpus_per_trial},
         time_budget_s=time_budget_minutes * 60  # Convert minutes to seconds
     )
 
@@ -152,7 +156,7 @@ def lgb_hyperopt_with_ray(
         num_boost_round=num_boost_round,
         callbacks=callbacks
     )
-    if dual_numbers > 0:
+    if dual_iterations > 0:
         print("trying to dual tring with best_params!")
         best_models, best_auc = dual_label_one(
             train_data_in = X_train,
@@ -161,10 +165,11 @@ def lgb_hyperopt_with_ray(
             test_label_in = y_test,
             initial_model = best_model,
             params = final_params,
-            dual_numbers = dual_numbers,
+            dual_iterations = dual_iterations,
+            dual_ratio = dual_ratio,
             num_boost_round = num_boost_round,
             early_stopping_rounds = early_stopping_rounds,
-            verbose_eval = verbose_eval
+            verbose_eval = verbose_eval,
         )
         return best_params, best_models, best_auc 
     else:
@@ -179,6 +184,7 @@ def train_folds(
     return_model: bool = True,
     num_class: int = None,
     dual_iterations: int = 5,
+    dual_ratio: float = 0.5 
 ):
     """
     Train a LightGBM model using purged cross-validation with early stopping.
@@ -219,12 +225,14 @@ def train_folds(
             y_train,
             X_test,
             y_test,
-            dual_numbers = dual_iterations,
+            dual_iterations = dual_iterations,
+            dual_ratio = dual_ratio,
             n_trials=args.n_trials,
             time_budget_minutes=args.time_budget_minutes,
             num_boost_round=args.num_boost_round,
             early_stopping_rounds=args.early_stopping_rounds,
             cpus_per_trial=args.cpus_per_trial,
+            gpus_per_trial=args.gpus_per_trial,
             verbose_eval=args.verbose_eval
         )
         if dual_iterations > 0:
