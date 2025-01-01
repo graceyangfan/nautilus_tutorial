@@ -62,3 +62,4 @@ def compute_pbo(perm_matrix: np.ndarray, eval_fn=sharpe_ratio, n_partitions=10):
     kde_dist = KDERv(kde)
     pbo = kde_dist.cdf(0)
     return pbo, rank_logits, train_optimal_perm, test_assoc_perm
+
