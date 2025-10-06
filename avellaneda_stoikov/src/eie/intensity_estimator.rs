@@ -48,7 +48,7 @@ impl IntensityEstimator {
         }
 
         let mid_price = (bid + ask) / 2.0;
-        let window_start = ts - self.w;
+        let window_start = ts.saturating_sub(self.w);
         self.sell_execution_intensity
             .on_tick(mid_price, bid, ts, window_start);
         self.buy_execution_intensity
@@ -71,7 +71,7 @@ impl IntensityEstimator {
     }
 
     pub fn estimate(&mut self, ts: u64) -> IntensityInfo {
-        let window_start = ts - self.w;
+        let window_start = ts.saturating_sub(self.w);
         return IntensityInfo::new(
             self.buy_execution_intensity.estimate_ak(ts, window_start),
             self.sell_execution_intensity.estimate_ak(ts, window_start),

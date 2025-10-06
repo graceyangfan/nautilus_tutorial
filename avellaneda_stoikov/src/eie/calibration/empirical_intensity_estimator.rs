@@ -66,7 +66,8 @@ impl EmpiricalIntensityEstimator {
     pub fn on_tick(&mut self, ref_price: f64, fill_price: f64, ts: u64, window_start: u64) {
         if self.initializing {
             self.initializing = false;
-            self.last_limit_order_inserted = ts - self.dt;
+            // avoid underflow when ts < dt on very first ticks
+            self.last_limit_order_inserted = ts.saturating_sub(self.dt);
         }
 
         let lt = &mut self.live_trackers.borrow_mut();

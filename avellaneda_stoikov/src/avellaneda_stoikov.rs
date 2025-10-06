@@ -49,9 +49,49 @@ impl AvellanedaStoikov {
         }
     }
 
-    pub fn initialized(&self) -> bool 
-    {
+    /// Returns whether the estimator has enough data to produce A/k
+    pub fn initialized(&self) -> bool {
         self.initialized
+    }
+
+    /// Ingest a single L1 tick (best ask/bid) with timestamp in milliseconds.
+    /// Returns true if the internal estimator has enough data to estimate A/k.
+    pub fn ingest_tick(&mut self, ask: f64, bid: f64, ts: u64) -> bool {
+        let ready = self.ie.on_tick(bid, ask, ts);
+        // mark as initialized only when window condition also satisfied
+        self.initialized = ready && ts >= self.start_time.saturating_add(self.estimate_window);
+        self.initialized
+    }
+
+    /// Estimate (buy_a, buy_k, sell_a, sell_k) if ready; otherwise returns None
+    pub fn estimate_ak(&mut self, ts: u64) -> Option<(f64, f64, f64, f64)> {
+        if ts >= self.start_time.saturating_add(self.estimate_window) {
+            let ii = self.ie.estimate(ts);
+            let (ba, bk, sa, sk) = ii.get_ak();
+            // ensure strictly positive values are returned upstream
+            if ba.is_finite() && bk.is_finite() && sa.is_finite() && sk.is_finite() {
+                self.initialized = true;
+                return Some((ba, bk, sa, sk));
+            }
+        }
+        self.initialized = false;
+        None
+    }
+
+    /// Reset estimator state and start_time
+    pub fn reset(&mut self, start_time: u64) {
+        // Recreate estimator to drop internal windows safely
+        let solver = SolverType::LogRegression;
+        let sf = AkSolverFactory::new(&solver);
+        self.ie = IntensityEstimator::new(
+            self.tick_size,
+            self.n_spreads,
+            self.estimate_window,
+            self.period,
+            sf,
+        );
+        self.start_time = start_time;
+        self.initialized = false;
     }
 
     pub fn calculate_intensity_info(
@@ -61,16 +101,12 @@ impl AvellanedaStoikov {
         ts: u64
     ) -> (f64, f64, f64, f64)
     {
-        let can_get = self.ie.on_tick(bid, ask, ts);
-        // wait to get more data
-        if can_get && ts > self.start_time + self.estimate_window + 1{
-            self.initialized = true;
-            let ii = self.ie.estimate(ts);
-            return ii.get_ak();
-        }
-        else{
-            self.initialized= false;
-            (0.0,0.0,0.0,0.0)
+        // Backward-compatible API: ingest + try estimate, else return zeros
+        let _ = self.ingest_tick(ask, bid, ts);
+        if let Some((ba, bk, sa, sk)) = self.estimate_ak(ts) {
+            (ba, bk, sa, sk)
+        } else {
+            (0.0, 0.0, 0.0, 0.0)
         }
     }
 
